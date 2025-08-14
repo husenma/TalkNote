@@ -1,0 +1,135 @@
+name: Free iOS Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # Test build (always free)
+  test-build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Install xcpretty  
+        run: sudo gem install xcpretty
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for simulator (free)
+        run: |
+          xcodebuild -project LiveTranscribe.xcodeproj \
+            -scheme LiveTranscribe \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            build | xcpretty
+
+      - name: Run tests
+        run: |
+          xcodebuild -project LiveTranscribe.xcodeproj \
+            -scheme LiveTranscribe \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            test | xcpretty
+
+  # App Store build (only when certificates are available)
+  app-store-build:
+    runs-on: macos-latest
+    needs: test-build
+    if: ${{ secrets.CERTIFICATES_P12 != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install xcodegen
+          sudo gem install xcpretty
+
+      - name: Import certificate
+        run: |
+          echo "${{ secrets.CERTIFICATES_P12 }}" | base64 --decode > distribution.p12
+          security create-keychain -p temp build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p temp build.keychain
+          security import distribution.p12 -k build.keychain -P "${{ secrets.CERTIFICATES_P12_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k temp build.keychain
+
+      - name: Update bundle ID and endpoint
+        run: |
+          # Update bundle ID in project.yml
+          sed -i '' 's/com.yourcompany.LiveTranscribe/${{ secrets.BUNDLE_ID }}/g' project.yml
+          
+          # Generate project with updated bundle ID
+          xcodegen generate
+          
+          # Inject token endpoint if available
+          if [ -n "${{ secrets.SPEECH_TOKEN_ENDPOINT }}" ]; then
+            /usr/libexec/PlistBuddy -c "Set :SPEECH_TOKEN_ENDPOINT ${{ secrets.SPEECH_TOKEN_ENDPOINT }}" ios/LiveTranscribe/Info.plist
+          fi
+
+      - name: Archive for App Store
+        run: |
+          xcodebuild archive \
+            -project LiveTranscribe.xcodeproj \
+            -scheme LiveTranscribe \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath ./LiveTranscribe.xcarchive \
+            -allowProvisioningUpdates
+
+      - name: Export IPA
+        run: |
+          # Update ExportOptions.plist with correct bundle ID and team
+          sed -i '' 's/com.yourcompany.LiveTranscribe/${{ secrets.BUNDLE_ID }}/g' scripts/ExportOptions.plist
+          sed -i '' 's/YOUR_TEAM_ID/${{ secrets.DEVELOPMENT_TEAM }}/g' scripts/ExportOptions.plist
+          
+          xcodebuild -exportArchive \
+            -archivePath ./LiveTranscribe.xcarchive \
+            -exportPath ./export \
+            -exportOptionsPlist ./scripts/ExportOptions.plist
+
+      - name: Upload to App Store Connect
+        if: ${{ secrets.APPSTORE_API_KEY != '' }}
+        run: |
+          # Create API key file
+          echo "${{ secrets.APPSTORE_API_KEY }}" > AuthKey_${{ secrets.APPSTORE_KEY_ID }}.p8
+          
+          # Upload to App Store Connect
+          xcrun altool --upload-app \
+            -f ./export/LiveTranscribe.ipa \
+            -t ios \
+            --apiKey ${{ secrets.APPSTORE_KEY_ID }} \
+            --apiIssuer ${{ secrets.APPSTORE_ISSUER_ID }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: LiveTranscribe-AppStore
+          path: |
+            ./export/LiveTranscribe.ipa
+            ./LiveTranscribe.xcarchive
+
+  # Deploy free backend to Netlify
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v2.0
+        with:
+          publish-dir: './netlify'
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
