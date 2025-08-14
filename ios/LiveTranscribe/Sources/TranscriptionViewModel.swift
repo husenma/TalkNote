@@ -15,7 +15,11 @@ final class TranscriptionViewModel: ObservableObject {
     private let azureSpeech = AzureSpeechService()
 
     func requestPermissions() {
-        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+        if #available(iOS 17.0, *) {
+            AVAudioApplication.requestRecordPermission { _ in }
+        } else {
+            AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+        }
         SpeechService.requestAuthorization()
     }
 
