@@ -6,7 +6,7 @@ final class TranscriptionViewModel: ObservableObject {
     @Published var displayText: String = ""
     @Published var isTranscribing: Bool = false
     @Published var targetLanguage: String = "en"
-    let supportedTargets = ["en", "es", "fr", "de", "zh-Hans", "hi", "ar", "ru", "ja", "ko"]
+    let supportedTargets = ["en", "es", "fr", "de", "zh-Hans", "hi", "bn", "ta", "te", "mr", "gu", "kn", "ar", "ru", "ja", "ko"]
 
     private let audio = AudioEngine()
     private let speech = SpeechService()
@@ -34,7 +34,7 @@ final class TranscriptionViewModel: ObservableObject {
         // Prefer Azure Speech Translation with auto language detection when configured
         if azureSpeech.isAvailable {
             azureSpeech.start(targetLanguage: targetLanguage,
-                              autoDetectLanguages: ["en-US","es-ES","fr-FR","de-DE","hi-IN","ar-SA","ru-RU","ja-JP","ko-KR","zh-CN"],
+                              autoDetectLanguages: ["en-US","es-ES","fr-FR","de-DE","hi-IN","bn-IN","ta-IN","te-IN","mr-IN","gu-IN","kn-IN","ar-SA","ru-RU","ja-JP","ko-KR","zh-CN"],
                               phrases: learning.currentPhrases) { [weak self] text, isFinal, detectedLang in
                 guard let self else { return }
                 Task { @MainActor in
