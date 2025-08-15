@@ -3,6 +3,10 @@ import Combine
 import Speech
 import AVFoundation
 
+// Type aliases to avoid conflicts
+typealias RLUserContext = UserContext
+typealias RLAudioFeatures = AudioFeatures
+
 /// Reinforcement Learning Engine for Indian Languages to English Translation
 /// Optimizes translation quality through user feedback and contextual learning
 public class ReinforcementLearningEngine: ObservableObject {
@@ -14,29 +18,14 @@ public class ReinforcementLearningEngine: ObservableObject {
         let translatedText: String
         let confidence: Float
         let languageCode: String
-        let audioFeatures: AudioFeatures
+        let audioFeatures: RLAudioFeatures
         let timestamp: Date
-    }
-    
-    public struct AudioFeatures {
-        let pitch: Float
-        let volume: Float
-        let speed: Float
-        let clarity: Float
-        let backgroundNoise: Float
     }
     
     public struct LearningState {
         let recentTranslations: [TranslationAction]
-        let userContext: UserContext
+        let userContext: RLUserContext
         let environmentalFactors: EnvironmentalFactors
-    }
-    
-    public struct UserContext {
-        let preferredDialect: String?
-        let domainContext: String? // medical, technical, casual, etc.
-        let speakerAge: AgeGroup?
-        let historicalAccuracy: Float
     }
     
     public struct EnvironmentalFactors {
@@ -139,8 +128,8 @@ public class ReinforcementLearningEngine: ObservableObject {
         proposedTranslation: String,
         confidence: Float,
         languageCode: String,
-        audioFeatures: AudioFeatures,
-        userContext: UserContext
+        audioFeatures: RLAudioFeatures,
+        userContext: RLUserContext
     ) -> String {
         
         let currentState = createLearningState(
@@ -224,12 +213,12 @@ public class ReinforcementLearningEngine: ObservableObject {
     // MARK: - Private Methods
     
     private func createLearningState(
-        userContext: UserContext,
-        audioFeatures: AudioFeatures
+        userContext: RLUserContext,
+        audioFeatures: RLAudioFeatures
     ) -> LearningState {
         
         let environmentalFactors = EnvironmentalFactors(
-            noiseLevel: audioFeatures.backgroundNoise,
+            noiseLevel: Float(audioFeatures.noiseLevel),
             acousticEnvironment: classifyAcousticEnvironment(audioFeatures),
             timeOfDay: getCurrentTimeOfDay()
         )
@@ -300,7 +289,7 @@ public class ReinforcementLearningEngine: ObservableObject {
     
     private func hashState(_ state: LearningState) -> String {
         // Create a simplified hash of the state for Q-table indexing
-        let contextHash = state.userContext.domainContext ?? "general"
+        let contextHash = state.userContext.languagePreference
         let noiseLevel = Int(state.environmentalFactors.noiseLevel * 10)
         let timeOfDay = state.environmentalFactors.timeOfDay
         
@@ -447,8 +436,8 @@ public class ReinforcementLearningEngine: ObservableObject {
     
     // MARK: - Utility Methods
     
-    private func classifyAcousticEnvironment(_ features: AudioFeatures) -> AcousticEnvironment {
-        switch features.backgroundNoise {
+    internal func classifyAcousticEnvironment(_ features: RLAudioFeatures) -> AcousticEnvironment {
+        switch features.noiseLevel {
         case 0.0..<0.2: return .quiet
         case 0.2..<0.5: return .moderate
         case 0.5..<0.8: return .noisy
@@ -521,7 +510,7 @@ private class LanguageSpecificModel {
         text: String,
         confidence: Float,
         qValue: Float,
-        context: UserContext
+        context: RLUserContext
     ) -> String {
         // Apply language-specific optimizations
         var optimizedText = text
@@ -548,7 +537,7 @@ private class LanguageSpecificModel {
         }
     }
     
-    func updateWithFeedback(translation: String, reward: Float, context: AudioFeatures) {
+    func updateWithFeedback(translation: String, reward: Float, context: RLAudioFeatures) {
         // Update phrase patterns based on feedback
         let words = translation.components(separatedBy: .whitespaces)
         for word in words {
