@@ -1,285 +1,613 @@
 import Foundation
-import CoreML
+import Combine
+import Speech
+import AVFoundation
 
-/// Reinforcement Learning Engine for TalkNote
-/// Learns from user interactions to improve speech recognition accuracy
-final class ReinforcementLearningEngine: ObservableObject {
+/// Reinforcement Learning Engine for Indian Languages to English Translation
+/// Optimizes translation quality through user feedback and contextual learning
+public class ReinforcementLearningEngine: ObservableObject {
     
-    // MARK: - Learning Data Storage
-    private struct LearningData: Codable {
-        let userInput: String
-        let recognizedText: String
-        let correctedText: String?
+    // MARK: - Types
+    
+    public struct TranslationAction {
+        let sourceText: String
+        let translatedText: String
         let confidence: Float
+        let languageCode: String
+        let audioFeatures: AudioFeatures
         let timestamp: Date
-        let language: String
-        let userFeedback: FeedbackType
     }
     
-    enum FeedbackType: String, Codable, CaseIterable {
-        case positive = "correct"
-        case negative = "incorrect" 
-        case neutral = "no_feedback"
-        case corrected = "user_corrected"
+    public struct AudioFeatures {
+        let pitch: Float
+        let volume: Float
+        let speed: Float
+        let clarity: Float
+        let backgroundNoise: Float
+    }
+    
+    public struct LearningState {
+        let recentTranslations: [TranslationAction]
+        let userContext: UserContext
+        let environmentalFactors: EnvironmentalFactors
+    }
+    
+    public struct UserContext {
+        let preferredDialect: String?
+        let domainContext: String? // medical, technical, casual, etc.
+        let speakerAge: AgeGroup?
+        let historicalAccuracy: Float
+    }
+    
+    public struct EnvironmentalFactors {
+        let noiseLevel: Float
+        let acousticEnvironment: AcousticEnvironment
+        let timeOfDay: TimeOfDay
+    }
+    
+    public enum AgeGroup {
+        case child, young, adult, senior
+    }
+    
+    public enum AcousticEnvironment {
+        case quiet, moderate, noisy, outdoor
+    }
+    
+    public enum TimeOfDay {
+        case morning, afternoon, evening, night
+    }
+    
+    public struct Reward {
+        let value: Float // -1.0 to 1.0
+        let feedback: FeedbackType
+        let context: String?
+    }
+    
+    public enum FeedbackType {
+        case userCorrection
+        case userApproval
+        case implicitPositive // user didn't correct
+        case implicitNegative // user immediately re-spoke
+        case contextualClues // based on follow-up conversation
     }
     
     // MARK: - Properties
-    @Published var learningProgress: Double = 0.0
-    @Published var accuracyScore: Double = 0.75 // Starting accuracy
-    @Published var totalInteractions: Int = 0
     
-    private var learningHistory: [LearningData] = []
-    private let maxHistorySize = 1000
-    private let learningRate: Float = 0.01
+    @Published public var learningMetrics = LearningMetrics()
+    @Published public var isTraining = false
+    
+    private var qTable: [String: Float] = [:]
+    private var experienceBuffer: [Experience] = []
+    private let maxBufferSize = 10000
+    private var episodeCount = 0
+    
+    // Hyperparameters
+    private let learningRate: Float = 0.1
+    private let discountFactor: Float = 0.95
+    private let explorationRate: Float = 0.1
+    private let explorationDecay: Float = 0.995
+    private var currentExplorationRate: Float
+    
+    // Indian Language Specific Models
+    private var hindiModel: LanguageSpecificModel
+    private var tamilModel: LanguageSpecificModel
+    private var teluguModel: LanguageSpecificModel
+    private var bengaliModel: LanguageSpecificModel
+    private var marathiModel: LanguageSpecificModel
+    private var gujaratiModel: LanguageSpecificModel
+    
+    private let userDefaults = UserDefaults.standard
+    private let modelPersistenceKey = "RLTranslationModel"
+    
+    public struct LearningMetrics {
+        var totalTranslations: Int = 0
+        var averageReward: Float = 0.0
+        var accuracyTrend: [Float] = []
+        var languageSpecificAccuracy: [String: Float] = [:]
+        var improvementRate: Float = 0.0
+    }
+    
+    private struct Experience {
+        let state: LearningState
+        let action: TranslationAction
+        let reward: Float
+        let nextState: LearningState?
+        let timestamp: Date
+    }
     
     // MARK: - Initialization
-    init() {
-        loadLearningHistory()
-        calculateCurrentAccuracy()
+    
+    public init() {
+        self.currentExplorationRate = explorationRate
+        
+        // Initialize language-specific models
+        self.hindiModel = LanguageSpecificModel(language: "hi")
+        self.tamilModel = LanguageSpecificModel(language: "ta")
+        self.teluguModel = LanguageSpecificModel(language: "te")
+        self.bengaliModel = LanguageSpecificModel(language: "bn")
+        self.marathiModel = LanguageSpecificModel(language: "mr")
+        self.gujaratiModel = LanguageSpecificModel(language: "gu")
+        
+        loadPersistedModel()
     }
     
-    // MARK: - Public Methods
+    // MARK: - Public Interface
     
-    /// Record user interaction for learning
-    func recordInteraction(
-        userInput: String,
-        recognizedText: String,
-        correctedText: String? = nil,
+    /// Optimizes translation based on current state and returns improved translation
+    public func optimizeTranslation(
+        originalText: String,
+        proposedTranslation: String,
         confidence: Float,
-        language: String,
-        feedback: FeedbackType = .neutral
-    ) {
-        let interaction = LearningData(
-            userInput: userInput,
-            recognizedText: recognizedText,
-            correctedText: correctedText,
-            confidence: confidence,
-            timestamp: Date(),
-            language: language,
-            userFeedback: feedback
+        languageCode: String,
+        audioFeatures: AudioFeatures,
+        userContext: UserContext
+    ) -> String {
+        
+        let currentState = createLearningState(
+            userContext: userContext,
+            audioFeatures: audioFeatures
         )
         
-        addLearningData(interaction)
-        updateAccuracyScore(interaction)
-        adaptToUserPreferences()
-        saveLearningHistory()
-    }
-    
-    /// Get personalized phrases based on learning
-    func getPersonalizedPhrases() -> [String] {
-        let commonPhrases = learningHistory
-            .compactMap { $0.correctedText ?? $0.recognizedText }
-            .reduce(into: [String: Int]()) { counts, phrase in
-                counts[phrase, default: 0] += 1
-            }
-            .sorted { $0.value > $1.value }
-            .prefix(20)
-            .map { $0.key }
+        let action = TranslationAction(
+            sourceText: originalText,
+            translatedText: proposedTranslation,
+            confidence: confidence,
+            languageCode: languageCode,
+            audioFeatures: audioFeatures,
+            timestamp: Date()
+        )
         
-        return Array(commonPhrases)
-    }
-    
-    /// Get language preferences based on usage
-    func getPreferredLanguages() -> [String] {
-        let languageUsage = learningHistory
-            .reduce(into: [String: Int]()) { counts, data in
-                counts[data.language, default: 0] += 1
-            }
-            .sorted { $0.value > $1.value }
-            .map { $0.key }
+        // Get Q-value for current state-action pair
+        let stateActionKey = createStateActionKey(state: currentState, action: action)
+        let qValue = qTable[stateActionKey] ?? 0.0
         
-        return Array(languageUsage.prefix(5))
+        // Apply language-specific optimizations
+        let optimizedTranslation = applyLanguageSpecificOptimization(
+            action: action,
+            state: currentState,
+            qValue: qValue
+        )
+        
+        // Store experience for later learning
+        let optimizedAction = TranslationAction(
+            sourceText: originalText,
+            translatedText: optimizedTranslation,
+            confidence: confidence,
+            languageCode: languageCode,
+            audioFeatures: audioFeatures,
+            timestamp: Date()
+        )
+        
+        storeExperience(state: currentState, action: optimizedAction)
+        
+        return optimizedTranslation
     }
     
-    /// Get confidence boost for frequently used phrases
-    func getConfidenceBoost(for text: String) -> Float {
-        let similarPhrases = learningHistory.filter { data in
-            let similarity = calculateSimilarity(text, data.recognizedText)
-            return similarity > 0.8 && data.userFeedback == .positive
+    /// Processes user feedback to improve future translations
+    public func processFeedback(
+        originalAction: TranslationAction,
+        feedback: Reward,
+        correctedTranslation: String? = nil
+    ) {
+        
+        updateExperienceWithReward(action: originalAction, reward: feedback)
+        
+        if let correction = correctedTranslation {
+            learnFromCorrection(
+                original: originalAction,
+                correction: correction,
+                reward: feedback
+            )
         }
         
-        let boost = Float(similarPhrases.count) * 0.1
-        return min(boost, 0.5) // Max 50% boost
-    }
-    
-    /// Learn from user corrections
-    func learnFromCorrection(original: String, corrected: String, language: String) {
-        recordInteraction(
-            userInput: "",
-            recognizedText: original,
-            correctedText: corrected,
-            confidence: 0.5,
-            language: language,
-            feedback: .corrected
+        // Update language-specific model
+        updateLanguageSpecificModel(
+            languageCode: originalAction.languageCode,
+            action: originalAction,
+            reward: feedback.value
         )
         
-        // Store common corrections for future reference
-        addCommonCorrection(from: original, to: corrected)
+        // Trigger learning update
+        performQLearningUpdate()
+        updateMetrics()
+    }
+    
+    /// Trains the model on accumulated experiences
+    public func trainModel() {
+        guard !experienceBuffer.isEmpty else { return }
+        
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            self?.performBatchTraining()
+        }
     }
     
     // MARK: - Private Methods
     
-    private func addLearningData(_ data: LearningData) {
-        learningHistory.append(data)
-        totalInteractions += 1
+    private func createLearningState(
+        userContext: UserContext,
+        audioFeatures: AudioFeatures
+    ) -> LearningState {
         
-        // Maintain history size limit
-        if learningHistory.count > maxHistorySize {
-            learningHistory.removeFirst(learningHistory.count - maxHistorySize)
+        let environmentalFactors = EnvironmentalFactors(
+            noiseLevel: audioFeatures.backgroundNoise,
+            acousticEnvironment: classifyAcousticEnvironment(audioFeatures),
+            timeOfDay: getCurrentTimeOfDay()
+        )
+        
+        let recentTranslations = getRecentTranslations(limit: 5)
+        
+        return LearningState(
+            recentTranslations: recentTranslations,
+            userContext: userContext,
+            environmentalFactors: environmentalFactors
+        )
+    }
+    
+    private func applyLanguageSpecificOptimization(
+        action: TranslationAction,
+        state: LearningState,
+        qValue: Float
+    ) -> String {
+        
+        let model = getLanguageModel(for: action.languageCode)
+        return model.optimizeTranslation(
+            text: action.translatedText,
+            confidence: action.confidence,
+            qValue: qValue,
+            context: state.userContext
+        )
+    }
+    
+    private func getLanguageModel(for languageCode: String) -> LanguageSpecificModel {
+        switch languageCode {
+        case "hi": return hindiModel
+        case "ta": return tamilModel
+        case "te": return teluguModel
+        case "bn": return bengaliModel
+        case "mr": return marathiModel
+        case "gu": return gujaratiModel
+        default: return hindiModel // fallback
         }
-        
-        // Update learning progress
-        learningProgress = min(Double(totalInteractions) / 1000.0, 1.0)
     }
     
-    private func updateAccuracyScore(_ interaction: LearningData) {
-        let feedback = interaction.userFeedback
-        let confidenceWeight = interaction.confidence
+    private func performQLearningUpdate() {
+        guard let lastExperience = experienceBuffer.last else { return }
         
-        var scoreAdjustment: Double = 0.0
+        let stateActionKey = createStateActionKey(
+            state: lastExperience.state,
+            action: lastExperience.action
+        )
         
-        switch feedback {
-        case .positive:
-            scoreAdjustment = Double(learningRate * confidenceWeight)
-        case .negative:
-            scoreAdjustment = -Double(learningRate * confidenceWeight)
-        case .corrected:
-            scoreAdjustment = -Double(learningRate * 0.5)
-        case .neutral:
-            scoreAdjustment = 0.0
+        let currentQ = qTable[stateActionKey] ?? 0.0
+        let maxNextQ = getMaxQValue(for: lastExperience.nextState)
+        
+        let newQ = currentQ + learningRate * (
+            lastExperience.reward + discountFactor * maxNextQ - currentQ
+        )
+        
+        qTable[stateActionKey] = newQ
+        
+        // Decay exploration rate
+        currentExplorationRate *= explorationDecay
+        currentExplorationRate = max(currentExplorationRate, 0.01)
+    }
+    
+    private func createStateActionKey(state: LearningState, action: TranslationAction) -> String {
+        let stateHash = hashState(state)
+        let actionHash = hashAction(action)
+        return "\(stateHash)_\(actionHash)"
+    }
+    
+    private func hashState(_ state: LearningState) -> String {
+        // Create a simplified hash of the state for Q-table indexing
+        let contextHash = state.userContext.domainContext ?? "general"
+        let noiseLevel = Int(state.environmentalFactors.noiseLevel * 10)
+        let timeOfDay = state.environmentalFactors.timeOfDay
+        
+        return "\(contextHash)_\(noiseLevel)_\(timeOfDay)"
+    }
+    
+    private func hashAction(_ action: TranslationAction) -> String {
+        // Create a simplified hash of the action
+        let confidenceLevel = Int(action.confidence * 10)
+        let textLength = min(action.translatedText.count / 10, 10)
+        
+        return "\(action.languageCode)_\(confidenceLevel)_\(textLength)"
+    }
+    
+    private func getMaxQValue(for state: LearningState?) -> Float {
+        guard let state = state else { return 0.0 }
+        
+        let stateHash = hashState(state)
+        let relevantQValues = qTable.filter { $0.key.hasPrefix(stateHash) }
+        
+        return relevantQValues.values.max() ?? 0.0
+    }
+    
+    private func storeExperience(state: LearningState, action: TranslationAction) {
+        let experience = Experience(
+            state: state,
+            action: action,
+            reward: 0.0, // Will be updated when feedback is received
+            nextState: nil,
+            timestamp: Date()
+        )
+        
+        experienceBuffer.append(experience)
+        
+        if experienceBuffer.count > maxBufferSize {
+            experienceBuffer.removeFirst()
         }
-        
-        accuracyScore = max(0.0, min(1.0, accuracyScore + scoreAdjustment))
     }
     
-    private func calculateCurrentAccuracy() {
-        let recentInteractions = learningHistory.suffix(100)
-        guard !recentInteractions.isEmpty else { return }
-        
-        let positiveCount = recentInteractions.count { $0.userFeedback == .positive }
-        let totalCount = recentInteractions.count
-        
-        accuracyScore = Double(positiveCount) / Double(totalCount)
-    }
-    
-    private func adaptToUserPreferences() {
-        // Analyze patterns in user corrections and feedback
-        let recentCorrections = learningHistory
-            .suffix(50)
-            .filter { $0.userFeedback == .corrected }
-        
-        // Learn common error patterns
-        for correction in recentCorrections {
-            if let corrected = correction.correctedText {
-                analyzeErrorPattern(
-                    original: correction.recognizedText,
-                    corrected: corrected
+    private func updateExperienceWithReward(action: TranslationAction, reward: Reward) {
+        // Find and update the corresponding experience
+        for i in experienceBuffer.indices.reversed() {
+            if experienceBuffer[i].action.timestamp == action.timestamp {
+                experienceBuffer[i] = Experience(
+                    state: experienceBuffer[i].state,
+                    action: experienceBuffer[i].action,
+                    reward: reward.value,
+                    nextState: experienceBuffer[i].nextState,
+                    timestamp: experienceBuffer[i].timestamp
                 )
+                break
             }
         }
     }
     
-    private func analyzeErrorPattern(original: String, corrected: String) {
-        // Simple pattern analysis - can be enhanced with ML models
-        let originalWords = original.lowercased().components(separatedBy: .whitespaces)
-        let correctedWords = corrected.lowercased().components(separatedBy: .whitespaces)
+    private func learnFromCorrection(
+        original: TranslationAction,
+        correction: String,
+        reward: Reward
+    ) {
+        // Store the correction as a high-value example
+        let correctedAction = TranslationAction(
+            sourceText: original.sourceText,
+            translatedText: correction,
+            confidence: 1.0, // High confidence for human corrections
+            languageCode: original.languageCode,
+            audioFeatures: original.audioFeatures,
+            timestamp: Date()
+        )
         
-        // Store word substitution patterns
-        if originalWords.count == correctedWords.count {
-            for (index, originalWord) in originalWords.enumerated() {
-                if originalWord != correctedWords[index] {
-                    addWordSubstitution(from: originalWord, to: correctedWords[index])
-                }
-            }
+        // Add to language-specific model training data
+        let model = getLanguageModel(for: original.languageCode)
+        model.addTrainingExample(
+            source: original.sourceText,
+            target: correction,
+            weight: abs(reward.value) + 0.5
+        )
+    }
+    
+    private func updateLanguageSpecificModel(
+        languageCode: String,
+        action: TranslationAction,
+        reward: Float
+    ) {
+        let model = getLanguageModel(for: languageCode)
+        model.updateWithFeedback(
+            translation: action.translatedText,
+            reward: reward,
+            context: action.audioFeatures
+        )
+    }
+    
+    private func performBatchTraining() {
+        isTraining = true
+        
+        // Sample experiences for training
+        let batchSize = min(32, experienceBuffer.count)
+        let experiences = Array(experienceBuffer.suffix(batchSize))
+        
+        for experience in experiences {
+            let stateActionKey = createStateActionKey(
+                state: experience.state,
+                action: experience.action
+            )
+            
+            let currentQ = qTable[stateActionKey] ?? 0.0
+            let maxNextQ = getMaxQValue(for: experience.nextState)
+            
+            let targetQ = experience.reward + discountFactor * maxNextQ
+            let newQ = currentQ + learningRate * (targetQ - currentQ)
+            
+            qTable[stateActionKey] = newQ
+        }
+        
+        episodeCount += 1
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.isTraining = false
+            self?.persistModel()
         }
     }
     
-    private func calculateSimilarity(_ text1: String, _ text2: String) -> Float {
-        let words1 = Set(text1.lowercased().components(separatedBy: .whitespaces))
-        let words2 = Set(text2.lowercased().components(separatedBy: .whitespaces))
+    private func updateMetrics() {
+        learningMetrics.totalTranslations += 1
         
-        let intersection = words1.intersection(words2)
-        let union = words1.union(words2)
+        // Calculate average reward from recent experiences
+        let recentExperiences = experienceBuffer.suffix(100)
+        let avgReward = recentExperiences.map { $0.reward }.reduce(0, +) / Float(recentExperiences.count)
+        learningMetrics.averageReward = avgReward
         
-        return union.isEmpty ? 0.0 : Float(intersection.count) / Float(union.count)
+        // Update accuracy trend
+        learningMetrics.accuracyTrend.append(avgReward)
+        if learningMetrics.accuracyTrend.count > 100 {
+            learningMetrics.accuracyTrend.removeFirst()
+        }
+        
+        // Calculate improvement rate
+        if learningMetrics.accuracyTrend.count >= 10 {
+            let recent = learningMetrics.accuracyTrend.suffix(10).reduce(0, +) / 10
+            let older = learningMetrics.accuracyTrend.prefix(10).reduce(0, +) / 10
+            learningMetrics.improvementRate = recent - older
+        }
+    }
+    
+    // MARK: - Utility Methods
+    
+    private func classifyAcousticEnvironment(_ features: AudioFeatures) -> AcousticEnvironment {
+        switch features.backgroundNoise {
+        case 0.0..<0.2: return .quiet
+        case 0.2..<0.5: return .moderate
+        case 0.5..<0.8: return .noisy
+        default: return .outdoor
+        }
+    }
+    
+    private func getCurrentTimeOfDay() -> TimeOfDay {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 6..<12: return .morning
+        case 12..<17: return .afternoon
+        case 17..<21: return .evening
+        default: return .night
+        }
+    }
+    
+    private func getRecentTranslations(limit: Int) -> [TranslationAction] {
+        return Array(experienceBuffer.suffix(limit).map { $0.action })
     }
     
     // MARK: - Persistence
     
-    private func saveLearningHistory() {
-        guard let data = try? JSONEncoder().encode(learningHistory) else { return }
-        UserDefaults.standard.set(data, forKey: "TalkNote_LearningHistory")
+    private func persistModel() {
+        let modelData = [
+            "qTable": qTable,
+            "episodeCount": episodeCount,
+            "explorationRate": currentExplorationRate
+        ] as [String: Any]
+        
+        if let data = try? JSONSerialization.data(withJSONObject: modelData) {
+            userDefaults.set(data, forKey: modelPersistenceKey)
+        }
     }
     
-    private func loadLearningHistory() {
-        guard let data = UserDefaults.standard.data(forKey: "TalkNote_LearningHistory"),
-              let history = try? JSONDecoder().decode([LearningData].self, from: data) else {
+    private func loadPersistedModel() {
+        guard let data = userDefaults.data(forKey: modelPersistenceKey),
+              let modelData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return
         }
-        learningHistory = history
-        totalInteractions = history.count
-    }
-    
-    // MARK: - Common Corrections & Word Substitutions
-    
-    private var commonCorrections: [String: String] = [:]
-    private var wordSubstitutions: [String: String] = [:]
-    
-    private func addCommonCorrection(from original: String, to corrected: String) {
-        commonCorrections[original.lowercased()] = corrected
-        saveCommonCorrections()
-    }
-    
-    private func addWordSubstitution(from original: String, to corrected: String) {
-        wordSubstitutions[original.lowercased()] = corrected
-        saveWordSubstitutions()
-    }
-    
-    private func saveCommonCorrections() {
-        UserDefaults.standard.set(commonCorrections, forKey: "TalkNote_CommonCorrections")
-    }
-    
-    private func saveWordSubstitutions() {
-        UserDefaults.standard.set(wordSubstitutions, forKey: "TalkNote_WordSubstitutions")
-    }
-    
-    private func loadCommonCorrections() {
-        commonCorrections = UserDefaults.standard.dictionary(forKey: "TalkNote_CommonCorrections") as? [String: String] ?? [:]
-        wordSubstitutions = UserDefaults.standard.dictionary(forKey: "TalkNote_WordSubstitutions") as? [String: String] ?? [:]
-    }
-    
-    /// Apply learned corrections to text
-    func applyLearnedCorrections(to text: String) -> String {
-        var correctedText = text
         
-        // Apply common corrections
-        for (original, correction) in commonCorrections {
-            correctedText = correctedText.replacingOccurrences(
-                of: original,
-                with: correction,
-                options: .caseInsensitive
-            )
+        if let qTableData = modelData["qTable"] as? [String: Float] {
+            qTable = qTableData
         }
         
-        // Apply word substitutions
-        let words = correctedText.components(separatedBy: .whitespaces)
-        let correctedWords = words.map { word in
-            wordSubstitutions[word.lowercased()] ?? word
+        if let episode = modelData["episodeCount"] as? Int {
+            episodeCount = episode
         }
         
-        return correctedWords.joined(separator: " ")
+        if let exploration = modelData["explorationRate"] as? Float {
+            currentExplorationRate = exploration
+        }
+    }
+}
+
+// MARK: - Language Specific Model
+
+private class LanguageSpecificModel {
+    let languageCode: String
+    private var phrasePatterns: [String: Float] = [:]
+    private var contextualMappings: [String: String] = [:]
+    private var trainingExamples: [(source: String, target: String, weight: Float)] = []
+    
+    init(language: String) {
+        self.languageCode = language
+        loadLanguageSpecificPatterns()
     }
     
-    // MARK: - Analytics
+    func optimizeTranslation(
+        text: String,
+        confidence: Float,
+        qValue: Float,
+        context: UserContext
+    ) -> String {
+        // Apply language-specific optimizations
+        var optimizedText = text
+        
+        // Apply contextual mappings
+        for (pattern, replacement) in contextualMappings {
+            optimizedText = optimizedText.replacingOccurrences(of: pattern, with: replacement)
+        }
+        
+        // Apply confidence-based adjustments
+        if confidence < 0.5 && qValue > 0.0 {
+            optimizedText = improveWithPatternMatching(optimizedText)
+        }
+        
+        return optimizedText
+    }
     
-    func getLearningAnalytics() -> [String: Any] {
-        return [
-            "total_interactions": totalInteractions,
-            "accuracy_score": accuracyScore,
-            "learning_progress": learningProgress,
-            "preferred_languages": getPreferredLanguages(),
-            "common_phrases_count": getPersonalizedPhrases().count,
-            "corrections_learned": commonCorrections.count
-        ]
+    func addTrainingExample(source: String, target: String, weight: Float) {
+        trainingExamples.append((source: source, target: target, weight: weight))
+        
+        // Keep only recent examples
+        if trainingExamples.count > 1000 {
+            trainingExamples.removeFirst()
+        }
+    }
+    
+    func updateWithFeedback(translation: String, reward: Float, context: AudioFeatures) {
+        // Update phrase patterns based on feedback
+        let words = translation.components(separatedBy: .whitespaces)
+        for word in words {
+            let currentScore = phrasePatterns[word] ?? 0.0
+            phrasePatterns[word] = currentScore + (reward * 0.1)
+        }
+    }
+    
+    private func loadLanguageSpecificPatterns() {
+        // Load common patterns and corrections for each Indian language
+        switch languageCode {
+        case "hi":
+            contextualMappings = [
+                "namaste": "hello",
+                "dhanyawad": "thank you",
+                "kaise hain": "how are you"
+            ]
+        case "ta":
+            contextualMappings = [
+                "vanakkam": "hello",
+                "nandri": "thank you",
+                "eppadi irukinga": "how are you"
+            ]
+        case "te":
+            contextualMappings = [
+                "namaskaram": "hello",
+                "dhanyavadalu": "thank you",
+                "ela unnaru": "how are you"
+            ]
+        // Add more languages...
+        default:
+            break
+        }
+    }
+    
+    private func improveWithPatternMatching(_ text: String) -> String {
+        // Use stored patterns to improve translation
+        var improvedText = text
+        let words = text.components(separatedBy: .whitespaces)
+        
+        for i in words.indices {
+            let word = words[i]
+            if let betterTranslation = findBetterTranslation(for: word) {
+                improvedText = improvedText.replacingOccurrences(of: word, with: betterTranslation)
+            }
+        }
+        
+        return improvedText
+    }
+    
+    private func findBetterTranslation(for word: String) -> String? {
+        // Look for better translations in training examples
+        for example in trainingExamples.reversed() {
+            if example.source.contains(word) && example.weight > 0.5 {
+                // Extract potential better translation
+                // This is simplified - in practice, you'd use more sophisticated NLP
+                return nil // Placeholder
+            }
+        }
+        return nil
     }
 }
