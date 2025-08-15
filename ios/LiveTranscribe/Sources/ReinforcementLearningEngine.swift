@@ -4,8 +4,8 @@ import Speech
 import AVFoundation
 
 // Type aliases to avoid conflicts
-typealias RLUserContext = UserContext
-typealias RLAudioFeatures = AudioFeatures
+public typealias RLUserContext = UserContext
+public typealias RLAudioFeatures = AudioFeatures
 
 /// Reinforcement Learning Engine for Indian Languages to English Translation
 /// Optimizes translation quality through user feedback and contextual learning
