@@ -33,7 +33,7 @@ We do not sell, trade, or share your personal information with third parties exc
 
 ### Third-Party Services
 - **Apple Speech Recognition**: Processes audio locally on device
-- **Azure Translator**: Processes text for translation (no audio sent)
+- **Azure Translator**: Processes text for translation (no audio sent) (not installed in the app)
 
 ## Data Security
 
@@ -53,7 +53,7 @@ This app does not knowingly collect information from children under 13.
 
 ## Contact Us
 
-For privacy questions, contact: [your-email@example.com]
+For privacy questions, contact: [husenmanekiya@gmail.com]
 
 ## Changes to Privacy Policy
 
