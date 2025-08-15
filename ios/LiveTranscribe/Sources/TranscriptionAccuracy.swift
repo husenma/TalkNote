@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the accuracy metrics for transcription and translation
-struct TranscriptionAccuracy: Codable {
+public struct TranscriptionAccuracy: Codable {
     let speechToTextAccuracy: Double
     let translationAccuracy: Double
     let overallConfidence: Double
@@ -10,7 +10,7 @@ struct TranscriptionAccuracy: Codable {
     let languageDetectionAccuracy: Double
     let timestamp: Date
     
-    init(
+    public init(
         speechToTextAccuracy: Double = 0.85,
         translationAccuracy: Double = 0.80,
         overallConfidence: Double = 0.82,
@@ -42,12 +42,12 @@ struct TranscriptionAccuracy: Codable {
     }
     
     /// Determine if this accuracy is better than another
-    func isBetterThan(_ other: TranscriptionAccuracy) -> Bool {
+    public func isBetterThan(_ other: TranscriptionAccuracy) -> Bool {
         return self.compositeScore > other.compositeScore
     }
     
     /// Create accuracy metrics from transcription results
-    static func calculate(
+    public static func calculate(
         originalText: String,
         transcribedText: String,
         translatedText: String,

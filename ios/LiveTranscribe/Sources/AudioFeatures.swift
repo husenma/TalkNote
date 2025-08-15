@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 /// Represents audio characteristics extracted from speech input
-struct AudioFeatures: Codable {
+public struct AudioFeatures: Codable {
     let amplitude: Double
     let frequency: Double
     let clarity: Double
@@ -12,7 +12,7 @@ struct AudioFeatures: Codable {
     let duration: TimeInterval
     let energyLevel: Double
     
-    init(
+    public init(
         amplitude: Double = 0.5,
         frequency: Double = 440.0,
         clarity: Double = 0.8,
@@ -33,7 +33,7 @@ struct AudioFeatures: Codable {
     }
     
     /// Extract basic audio features from audio buffer (simplified)
-    static func extract(from buffer: AVAudioPCMBuffer?) -> AudioFeatures {
+    public static func extract(from buffer: AVAudioPCMBuffer?) -> AudioFeatures {
         guard let buffer = buffer,
               let channelData = buffer.floatChannelData else {
             return AudioFeatures()
@@ -67,7 +67,7 @@ struct AudioFeatures: Codable {
     }
     
     /// Convert audio features to normalized vector for ML processing
-    func toFeatureVector() -> [Double] {
+    public func toFeatureVector() -> [Double] {
         return [
             min(amplitude, 1.0), // clamp to [0,1]
             frequency / 1000.0, // normalize frequency

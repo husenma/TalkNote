@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the user's context and environment for reinforcement learning
-struct UserContext: Codable {
+public struct UserContext: Codable {
     let timestamp: Date
     let deviceOrientation: String
     let backgroundNoise: NoiseLevel
@@ -10,7 +10,7 @@ struct UserContext: Codable {
     let sessionDuration: TimeInterval
     let previousAccuracy: Double
     
-    enum NoiseLevel: String, Codable, CaseIterable {
+    public enum NoiseLevel: String, Codable, CaseIterable {
         case quiet = "quiet"
         case moderate = "moderate"
         case noisy = "noisy"
@@ -24,7 +24,7 @@ struct UserContext: Codable {
         }
     }
     
-    enum SpeakingSpeed: String, Codable, CaseIterable {
+    public enum SpeakingSpeed: String, Codable, CaseIterable {
         case slow = "slow"
         case normal = "normal"
         case fast = "fast"
@@ -38,7 +38,7 @@ struct UserContext: Codable {
         }
     }
     
-    init(
+    public init(
         timestamp: Date = Date(),
         deviceOrientation: String = "portrait",
         backgroundNoise: NoiseLevel = .moderate,
@@ -57,7 +57,7 @@ struct UserContext: Codable {
     }
     
     /// Convert context to feature vector for ML processing
-    func toFeatureVector() -> [Double] {
+    public func toFeatureVector() -> [Double] {
         return [
             backgroundNoise.numericValue,
             speakingSpeed.numericValue,
