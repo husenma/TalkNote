@@ -84,14 +84,32 @@ struct ContentView: View {
     
     private var headerView: some View {
         HStack {
-            VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.xs) {
-                Text("TalkNote")
-                    .font(TalkNoteDesign.Typography.largeTitle)
-                    .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+            // Logo and title section
+            HStack(spacing: TalkNoteDesign.Spacing.sm) {
+                // App logo
+                if let logoImage = UIImage(named: "logo") {
+                    Image(uiImage: logoImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    // Fallback icon if logo doesn't load
+                    Image(systemName: "message.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(TalkNoteDesign.Colors.accent)
+                        .frame(width: 40, height: 40)
+                }
                 
-                Text("Real-time Translation")
-                    .font(TalkNoteDesign.Typography.caption)
-                    .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.xs) {
+                    Text("TalkNote")
+                        .font(TalkNoteDesign.Typography.largeTitle)
+                        .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                    
+                    Text("Real-time Translation")
+                        .font(TalkNoteDesign.Typography.caption)
+                        .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                }
             }
             
             Spacer()
