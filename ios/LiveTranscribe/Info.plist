@@ -7,7 +7,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>TalkNote</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.example.TalkNote</string>
+	<string>com.talknote.app</string>
 	<key>CFBundleName</key>
 	<string>TalkNote</string>
 	<key>CFBundlePackageType</key>
