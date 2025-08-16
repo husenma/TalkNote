@@ -1,7 +1,10 @@
 import SwiftUI
+import Speech
+import AVFoundation
 
 struct ContentView: View {
     @StateObject private var vm = TranscriptionViewModel()
+    @State private var permissionsGranted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -23,7 +26,26 @@ struct ContentView: View {
                 }.pickerStyle(.menu)
             }.padding()
         }
-        .onAppear { vm.requestPermissions() }
+        .onAppear {
+            requestPermissions()
+        }
+    }
+    
+    private func requestPermissions() {
+        // Request microphone permission first
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            if granted {
+                // Then request speech recognition permission
+                SFSpeechRecognizer.requestAuthorization { status in
+                    DispatchQueue.main.async {
+                        self.permissionsGranted = (status == .authorized)
+                        if self.permissionsGranted {
+                            vm.requestPermissions()
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
