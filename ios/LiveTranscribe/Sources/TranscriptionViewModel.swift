@@ -22,27 +22,27 @@ final class TranscriptionViewModel: ObservableObject {
     private var sessionStartTime: TimeInterval = 0
 
     func requestPermissions() {
-        Swift.print("🔐 DEBUG: Requesting permissions...")
+        print("🔐 DEBUG: Requesting permissions...")
         if #available(iOS 17.0, *) {
             AVAudioApplication.requestRecordPermission { granted in
-                Swift.print("🎤 DEBUG: iOS 17+ Audio permission granted: \(granted)")
+                print("🎤 DEBUG: iOS 17+ Audio permission granted: \(granted)")
             }
         } else {
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                Swift.print("🎤 DEBUG: iOS 16- Audio permission granted: \(granted)")
+                print("🎤 DEBUG: iOS 16- Audio permission granted: \(granted)")
             }
         }
         SpeechService.requestAuthorization()
-        Swift.print("🗣️ DEBUG: Speech authorization requested")
+        print("🗣️ DEBUG: Speech authorization requested")
     }
 
     func toggle() {
-        Swift.print("🔄 DEBUG: Toggle called, current state: isTranscribing = \(isTranscribing)")
+        print("🔄 DEBUG: Toggle called, current state: isTranscribing = \(isTranscribing)")
         if isTranscribing { stop() } else { start() }
     }
 
     func start() {
-        Swift.print("🚀 DEBUG: Start function called")
+        print("🚀 DEBUG: Start function called")
         // Check permissions before starting
         let micPermissionGranted: Bool
         if #available(iOS 17.0, *) {
@@ -58,29 +58,29 @@ final class TranscriptionViewModel: ObservableObject {
         }
         
         let speechPermissionGranted = SFSpeechRecognizer.authorizationStatus() == .authorized
-        Swift.print("🔐 DEBUG: Permissions - Mic: \(micPermissionGranted), Speech: \(speechPermissionGranted)")
+        print("🔐 DEBUG: Permissions - Mic: \(micPermissionGranted), Speech: \(speechPermissionGranted)")
         
         guard micPermissionGranted, speechPermissionGranted else {
-            Swift.print("❌ DEBUG: Required permissions not granted - stopping start process")
+            print("❌ DEBUG: Required permissions not granted - stopping start process")
             return
         }
         
         isTranscribing = true
         displayText = ""
         sessionStartTime = Date().timeIntervalSince1970
-        Swift.print("🎤 DEBUG: Starting transcription...")
+        print("🎤 DEBUG: Starting transcription...")
 
         // Prefer Azure Speech Translation with auto language detection when configured
         if azureSpeech.isAvailable {
-            Swift.print("🔥 DEBUG: Using Azure Speech service")
+            print("🔥 DEBUG: Using Azure Speech service")
             azureSpeech.start(targetLanguage: targetLanguage,
                               autoDetectLanguages: ["en-US","es-ES","fr-FR","de-DE","hi-IN","bn-IN","ta-IN","te-IN","mr-IN","gu-IN","kn-IN","ar-SA","ru-RU","ja-JP","ko-KR","zh-CN"],
                               phrases: learning.currentPhrases) { [weak self] text, isFinal, detectedLang in
                 guard let self else { return }
                 Task { @MainActor in
-                    Swift.print("🎯 DEBUG: Azure speech result: '\(text)', isFinal: \(isFinal)")
+                    print("🎯 DEBUG: Azure speech result: '\(text)', isFinal: \(isFinal)")
                     if self.displayText.isEmpty { self.displayText = text } else { self.displayText += (text.isEmpty ? "" : " " + text) }
-                    Swift.print("📝 DEBUG: displayText updated to: '\(self.displayText)'")
+                    print("📝 DEBUG: displayText updated to: '\(self.displayText)'")
                 }
                 }
             }
@@ -89,14 +89,14 @@ final class TranscriptionViewModel: ObservableObject {
         }
 
         // Fallback: Apple Speech + Azure Translator with RL enhancement
-        Swift.print("🍎 DEBUG: Using Apple Speech service (Azure not available)")
+        print("🍎 DEBUG: Using Apple Speech service (Azure not available)")
         speech.start(onResult: { [weak self] text, isFinal, detectedLang in
             guard let self else { return }
-            Swift.print("🎯 DEBUG: Apple speech result: '\(text)', isFinal: \(isFinal), detected: \(detectedLang)")
+            print("🎯 DEBUG: Apple speech result: '\(text)', isFinal: \(isFinal), detected: \(detectedLang)")
             Task { @MainActor in
                 do {
                     let translated = try await self.translator.translate(text: text, from: detectedLang, to: self.targetLanguage)
-                    Swift.print("🌐 DEBUG: Translation result: '\(translated)'")
+                    print("🌐 DEBUG: Translation result: '\(translated)'")
                     
                     // Enhance translation with reinforcement learning
                     let audioFeatures = RLAudioFeatures()
@@ -113,7 +113,7 @@ final class TranscriptionViewModel: ObservableObject {
                         audioFeatures: audioFeatures,
                         userContext: userContext
                     )
-                    Swift.print("🧠 DEBUG: RL optimized translation: '\(optimizedTranslation)'")
+                    print("🧠 DEBUG: RL optimized translation: '\(optimizedTranslation)'")
                     
                     if self.displayText.isEmpty {
                         self.displayText = optimizedTranslation
@@ -123,29 +123,29 @@ final class TranscriptionViewModel: ObservableObject {
                         // Show partial inline (optional). Keep UI simple: append preview with ellipsis
                         self.displayText += " " + translated
                     }
-                    Swift.print("📝 DEBUG: Final displayText: '\(self.displayText)'")
+                    print("📝 DEBUG: Final displayText: '\(self.displayText)'")
                 } catch {
                     // Ignore translation errors; keep raw text
-                    Swift.print("❌ DEBUG: Translation error: \(error), using raw text: '\(text)'")
+                    print("❌ DEBUG: Translation error: \(error), using raw text: '\(text)'")
                     if self.displayText.isEmpty { self.displayText = text } else { self.displayText += " " + text }
-                    Swift.print("📝 DEBUG: displayText (raw): '\(self.displayText)'")
+                    print("📝 DEBUG: displayText (raw): '\(self.displayText)'")
                 }
             }
         }, userPhrases: learning.currentPhrases)
 
-        Swift.print("🎧 DEBUG: Starting audio streaming...")
+        print("🎧 DEBUG: Starting audio streaming...")
         audio.startStreaming { [weak self] buffer, when in
-            Swift.print("🔊 DEBUG: Audio buffer received, size: \(buffer.frameLength)")
+            print("🔊 DEBUG: Audio buffer received, size: \(buffer.frameLength)")
             self?.speech.append(buffer: buffer)
         }
     }
 
     func stop() {
-        Swift.print("⏹️ DEBUG: Stopping transcription...")
+        print("⏹️ DEBUG: Stopping transcription...")
         isTranscribing = false
         audio.stop()
         Task { await speech.shutdown() }
-        Swift.print("🔇 DEBUG: Transcription stopped, final text: '\(displayText)'")
+        print("🔇 DEBUG: Transcription stopped, final text: '\(displayText)'")
     }
     
     // MARK: - Reinforcement Learning Feedback
@@ -186,7 +186,7 @@ final class TranscriptionViewModel: ObservableObject {
     
     // MARK: - Test Mode
     func testTranscription() {
-        Swift.print("🧪 DEBUG: Test mode activated")
+        print("🧪 DEBUG: Test mode activated")
         isTranscribing = true
         displayText = "Test: This is a sample transcription to verify the UI is working correctly."
         
@@ -206,7 +206,7 @@ final class TranscriptionViewModel: ObservableObject {
     
     // Force start with minimal checks
     func forceStart() {
-        Swift.print("🔥 DEBUG: Force starting transcription with minimal checks...")
+        print("🔥 DEBUG: Force starting transcription with minimal checks...")
         isTranscribing = true
         displayText = "Force started - waiting for audio..."
         sessionStartTime = Date().timeIntervalSince1970
@@ -214,19 +214,19 @@ final class TranscriptionViewModel: ObservableObject {
         // Use Apple Speech as it's more reliable
         speech.start(onResult: { [weak self] text, isFinal, detectedLang in
             guard let self else { return }
-            Swift.print("🎯 DEBUG: Force mode - speech result: '\(text)'")
+            print("🎯 DEBUG: Force mode - speech result: '\(text)'")
             Task { @MainActor in
                 if self.displayText.contains("Force started") {
                     self.displayText = text
                 } else {
                     self.displayText += " " + text
                 }
-                Swift.print("📝 DEBUG: Force mode - displayText: '\(self.displayText)'")
+                print("📝 DEBUG: Force mode - displayText: '\(self.displayText)'")
             }
         }, userPhrases: [])
 
         audio.startStreaming { [weak self] buffer, when in
-            Swift.print("🔊 DEBUG: Force mode - audio buffer: \(buffer.frameLength)")
+            print("🔊 DEBUG: Force mode - audio buffer: \(buffer.frameLength)")
             self?.speech.append(buffer: buffer)
         }
     }
