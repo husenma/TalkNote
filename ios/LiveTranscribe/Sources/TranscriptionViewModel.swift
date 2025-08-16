@@ -181,4 +181,51 @@ final class TranscriptionViewModel: ObservableObject {
     func shareText() {
         // Share functionality - can be implemented later
     }
+    
+    // MARK: - Test Mode
+    func testTranscription() {
+        print("🧪 DEBUG: Test mode activated")
+        isTranscribing = true
+        displayText = "Test: This is a sample transcription to verify the UI is working correctly."
+        
+        // Simulate ongoing transcription updates
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            if self.isTranscribing {
+                self.displayText += " Adding more text to test live updates..."
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            if self.isTranscribing {
+                self.displayText += " Final test message. If you see this, the transcription system is working!"
+            }
+        }
+    }
+    
+    // Force start with minimal checks
+    func forceStart() {
+        print("🔥 DEBUG: Force starting transcription with minimal checks...")
+        isTranscribing = true
+        displayText = "Force started - waiting for audio..."
+        sessionStartTime = Date().timeIntervalSince1970
+        
+        // Use Apple Speech as it's more reliable
+        speech.start(onResult: { [weak self] text, isFinal, detectedLang in
+            guard let self else { return }
+            print("🎯 DEBUG: Force mode - speech result: '\(text)'")
+            Task { @MainActor in
+                if self.displayText.contains("Force started") {
+                    self.displayText = text
+                } else {
+                    self.displayText += " " + text
+                }
+                print("📝 DEBUG: Force mode - displayText: '\(self.displayText)'")
+            }
+        }, userPhrases: [])
+
+        audio.startStreaming { [weak self] buffer, when in
+            print("🔊 DEBUG: Force mode - audio buffer: \(buffer.frameLength)")
+            self?.speech.append(buffer: buffer)
+        }
+    }
 }

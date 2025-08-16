@@ -11,48 +11,67 @@ struct ContentView: View {
     @State private var showingSecuritySettings = false
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Background gradient
-                LinearGradient(
-                    colors: [
-                        TalkNoteDesign.Colors.surface,
-                        TalkNoteDesign.Colors.surfaceSecondary
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea(.all)
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                colors: [
+                    TalkNoteDesign.Colors.surface,
+                    TalkNoteDesign.Colors.surfaceSecondary
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea(.all, edges: .all)
+            
+            VStack(spacing: TalkNoteDesign.Spacing.lg) {
+                // Header with security status
+                headerView
+                    .padding(.top, TalkNoteDesign.Spacing.xxl) // More top padding since no nav bar
                 
-                VStack(spacing: TalkNoteDesign.Spacing.lg) {
-                    // Header with security status
-                    headerView
-                        .padding(.top, TalkNoteDesign.Spacing.md)
-                    
-                    // Main transcription area
-                    transcriptionAreaView
-                        .layoutPriority(1)
-                    
-                    // Language selection cards
-                    languageSelectionView
-                    
-                    // Main control button
-                    microphoneButtonView
-                        .padding(.bottom, TalkNoteDesign.Spacing.md)
-                    
-                    // Recording indicator
-                    if vm.isTranscribing {
-                        recordingIndicatorView
+                // Main transcription area
+                transcriptionAreaView
+                    .layoutPriority(1)
+                
+                // Language selection cards
+                languageSelectionView
+                
+                // Main control button
+                microphoneButtonView
+                    .padding(.bottom, TalkNoteDesign.Spacing.md)
+                
+                // Test buttons for debugging
+                HStack(spacing: TalkNoteDesign.Spacing.sm) {
+                    Button("Test UI") {
+                        vm.testTranscription()
                     }
+                    .buttonStyle(SecondaryButtonStyle())
                     
-                    Spacer(minLength: TalkNoteDesign.Spacing.md)
+                    Button("Force Start") {
+                        vm.forceStart()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    
+                    Button("Clear") {
+                        vm.clearText()
+                        if vm.isTranscribing {
+                            vm.stop()
+                        }
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
-                .padding(TalkNoteDesign.Spacing.md)
+                .padding(.horizontal)
+                
+                // Recording indicator
+                if vm.isTranscribing {
+                    recordingIndicatorView
+                }
+                
+                Spacer(minLength: TalkNoteDesign.Spacing.md)
             }
+            .padding(TalkNoteDesign.Spacing.md)
         }
-        .navigationViewStyle(.stack)
-        .navigationBarHidden(true)
         .ignoresSafeArea(.all, edges: .all)
+        .statusBarHidden()
         .onAppear {
             // Check permissions when view appears
             startupPermissionManager.checkInitialPermissions()
@@ -187,11 +206,35 @@ struct ContentView: View {
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 120)
                             } else {
-                                Text(vm.displayText)
-                                    .font(TalkNoteDesign.Typography.body)
-                                    .foregroundColor(TalkNoteDesign.Colors.textPrimary)
-                                    .textSelection(.enabled)
-                                    .id("transcriptionText")
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(vm.displayText)
+                                        .font(TalkNoteDesign.Typography.body)
+                                        .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                                        .textSelection(.enabled)
+                                        .padding(12)
+                                        .background(TalkNoteDesign.Colors.surfaceSecondary)
+                                        .cornerRadius(8)
+                                        .id("transcriptionText")
+                                    
+                                    // Character count indicator
+                                    HStack {
+                                        Text("\(vm.displayText.count) characters")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        if vm.isTranscribing {
+                                            HStack(spacing: 4) {
+                                                Circle()
+                                                    .fill(Color.red)
+                                                    .frame(width: 8, height: 8)
+                                                Text("LIVE")
+                                                    .font(.caption)
+                                                    .fontWeight(.bold)
+                                                    .foregroundColor(.red)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                             
                             // Debug status section
