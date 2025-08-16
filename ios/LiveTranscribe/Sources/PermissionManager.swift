@@ -34,7 +34,13 @@ final class PermissionManager: ObservableObject {
     
     /// Check current permission states
     func checkCurrentPermissions() {
-        let newMicPermission = AVAudioSession.sharedInstance().recordPermission
+        let newMicPermission: AVAudioSession.RecordPermission
+        if #available(iOS 17.0, *) {
+            newMicPermission = AVAudioApplication.shared.recordPermission
+        } else {
+            newMicPermission = AVAudioSession.sharedInstance().recordPermission
+        }
+        
         let newSpeechPermission = SFSpeechRecognizer.authorizationStatus()
         
         if microphonePermission != newMicPermission || speechPermission != newSpeechPermission {
@@ -51,6 +57,18 @@ final class PermissionManager: ObservableObject {
     func validatePermissionsForAudioOperation() -> Bool {
         checkCurrentPermissions()
         return allPermissionsGranted
+    }
+    
+    /// Check if all required permissions are granted
+    var allPermissionsGranted: Bool {
+        let micPermissionGranted: Bool
+        if #available(iOS 17.0, *) {
+            micPermissionGranted = microphonePermission == .granted
+        } else {
+            micPermissionGranted = microphonePermission == .granted
+        }
+        
+        return micPermissionGranted && speechPermission == .authorized
     }
     
     /// Request all required permissions sequentially
@@ -74,11 +92,21 @@ final class PermissionManager: ObservableObject {
     /// Request microphone permission
     private func requestMicrophonePermission() async {
         return await withCheckedContinuation { continuation in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                Task { @MainActor in
-                    self.microphonePermission = granted ? .granted : .denied
-                    self.updatePermissionsStatus()
-                    continuation.resume()
+            if #available(iOS 17.0, *) {
+                AVAudioApplication.requestRecordPermission { granted in
+                    Task { @MainActor in
+                        self.microphonePermission = granted ? .granted : .denied
+                        self.updatePermissionsStatus()
+                        continuation.resume()
+                    }
+                }
+            } else {
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                    Task { @MainActor in
+                        self.microphonePermission = granted ? .granted : .denied
+                        self.updatePermissionsStatus()
+                        continuation.resume()
+                    }
                 }
             }
         }
@@ -100,11 +128,6 @@ final class PermissionManager: ObservableObject {
     /// Update the overall permissions status
     private func updatePermissionsStatus() {
         permissionsGranted = (microphonePermission == .granted) && (speechPermission == .authorized)
-    }
-    
-    /// Check if all required permissions are granted
-    var allPermissionsGranted: Bool {
-        return microphonePermission == .granted && speechPermission == .authorized
     }
     
     /// Get detailed permission status description

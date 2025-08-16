@@ -36,7 +36,14 @@ final class TranscriptionViewModel: ObservableObject {
 
     func start() {
         // Check permissions before starting
-        guard AVAudioSession.sharedInstance().recordPermission == .granted,
+        let micPermissionGranted: Bool
+        if #available(iOS 17.0, *) {
+            micPermissionGranted = AVAudioApplication.shared.recordPermission == .granted
+        } else {
+            micPermissionGranted = AVAudioSession.sharedInstance().recordPermission == .granted
+        }
+        
+        guard micPermissionGranted,
               SFSpeechRecognizer.authorizationStatus() == .authorized else {
             print("Required permissions not granted")
             return

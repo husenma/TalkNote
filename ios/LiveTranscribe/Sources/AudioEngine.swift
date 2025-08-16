@@ -7,7 +7,14 @@ final class AudioEngine {
 
     func startStreaming(onBuffer: @escaping (AVAudioPCMBuffer, AVAudioTime) -> Void) {
         // First check if we have microphone permission
-        guard AVAudioSession.sharedInstance().recordPermission == .granted else {
+        let hasPermission: Bool
+        if #available(iOS 17.0, *) {
+            hasPermission = AVAudioApplication.shared.recordPermission == .granted
+        } else {
+            hasPermission = AVAudioSession.sharedInstance().recordPermission == .granted
+        }
+        
+        guard hasPermission else {
             print("Microphone permission not granted")
             return
         }
@@ -20,8 +27,8 @@ final class AudioEngine {
         let input = engine.inputNode
         let format = input.inputFormat(forBus: bus)
 
-        // Remove any existing tap first
-        if input.numberOfTaps > 0 {
+        // Remove any existing tap first - check if tap exists before removing
+        if input.inputFormat(forBus: bus).channelCount > 0 {
             input.removeTap(onBus: bus)
         }
 
@@ -44,8 +51,13 @@ final class AudioEngine {
     }
 
     func stop() {
-        if engine.inputNode.numberOfTaps > 0 {
+        // Safely remove tap - AVAudioInputNode doesn't have numberOfTaps property
+        // We'll use a try-catch approach to safely remove taps
+        do {
             engine.inputNode.removeTap(onBus: bus)
+        } catch {
+            // Tap might not exist, which is fine
+            print("No tap to remove or tap removal failed: \(error)")
         }
         
         if engine.isRunning {

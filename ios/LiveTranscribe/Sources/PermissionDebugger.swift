@@ -22,11 +22,20 @@ final class PermissionDebugger {
     }
     
     private var microphoneStatusString: String {
-        switch AVAudioSession.sharedInstance().recordPermission {
-        case .undetermined: return "Undetermined"
-        case .granted: return "Granted ✅"
-        case .denied: return "Denied ❌"
-        @unknown default: return "Unknown"
+        if #available(iOS 17.0, *) {
+            switch AVAudioApplication.shared.recordPermission {
+            case .undetermined: return "Undetermined"
+            case .granted: return "Granted ✅"
+            case .denied: return "Denied ❌"
+            @unknown default: return "Unknown"
+            }
+        } else {
+            switch AVAudioSession.sharedInstance().recordPermission {
+            case .undetermined: return "Undetermined"
+            case .granted: return "Granted ✅"
+            case .denied: return "Denied ❌"
+            @unknown default: return "Unknown"
+            }
         }
     }
     
@@ -41,8 +50,14 @@ final class PermissionDebugger {
     }
     
     private var allPermissionsGranted: Bool {
-        return AVAudioSession.sharedInstance().recordPermission == .granted &&
-               SFSpeechRecognizer.authorizationStatus() == .authorized
+        let micPermissionGranted: Bool
+        if #available(iOS 17.0, *) {
+            micPermissionGranted = AVAudioApplication.shared.recordPermission == .granted
+        } else {
+            micPermissionGranted = AVAudioSession.sharedInstance().recordPermission == .granted
+        }
+        
+        return micPermissionGranted && SFSpeechRecognizer.authorizationStatus() == .authorized
     }
     
     private func logRequiredInfoPlistKeys() {
