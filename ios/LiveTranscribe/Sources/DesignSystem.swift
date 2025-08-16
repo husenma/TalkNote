@@ -11,6 +11,7 @@ struct TalkNoteDesign {
         static let primaryLight = Color(red: 0.4, green: 0.7, blue: 1.0)
         
         // Accent colors
+        static let accent = Color(red: 0.0, green: 0.32, blue: 0.8) // Primary accent color
         static let accentOrange = Color(red: 1.0, green: 0.58, blue: 0.0)
         static let accentGreen = Color(red: 0.2, green: 0.8, blue: 0.2)
         static let accentRed = Color(red: 1.0, green: 0.3, blue: 0.3)

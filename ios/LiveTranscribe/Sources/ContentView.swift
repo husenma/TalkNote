@@ -54,7 +54,7 @@ struct ContentView: View {
             startupPermissionManager.checkInitialPermissions()
             permissionManager.checkCurrentPermissions()
         }
-        .onChange(of: startupPermissionManager.allPermissionsGranted) { granted in
+        .onChange(of: startupPermissionManager.allPermissionsGranted) { _, granted in
             if granted {
                 // Refresh permission manager when startup permissions are granted
                 permissionManager.checkCurrentPermissions()
@@ -191,7 +191,7 @@ struct ContentView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .onChange(of: vm.displayText) { _ in
+                        .onChange(of: vm.displayText) { _, _ in
                             withAnimation(.easeOut(duration: 0.3)) {
                                 proxy.scrollTo("transcriptionText", anchor: .bottom)
                             }
