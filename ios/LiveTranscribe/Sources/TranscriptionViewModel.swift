@@ -285,7 +285,9 @@ class TranscriptionViewModel: ObservableObject {
                 confidence: 0.8,
                 context: currentTranscriptionContext
             )
-        }    private func detectLanguageHeuristically(text: String) -> String {
+        }
+        
+        private func detectLanguageHeuristically(text: String) -> String {
         let supportedLanguages = ["en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "hi", "ur", "bn", "te", "mr", "ta", "gu", "kn", "ml", "or", "pa", "as", "ne", "sd", "sa"]
         
         // Indian Languages Character Detection
