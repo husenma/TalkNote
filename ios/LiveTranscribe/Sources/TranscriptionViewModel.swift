@@ -13,8 +13,8 @@ final class TranscriptionViewModel: ObservableObject {
     let supportedTargets = ["en", "hi", "bn", "ta", "te", "mr", "gu", "kn", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
     let supportedSources = ["hi", "bn", "ta", "te", "mr", "gu", "kn", "en", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
 
-    private let audio = AudioEngine()
-    private let speech = SpeechService()
+    private lazy var audio = AudioEngine()
+    private lazy var speech = SpeechService()
     private let translator = TranslatorService()
     private let learning = UserLearningStore()
     private let azureSpeech = AzureSpeechService()

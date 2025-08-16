@@ -29,17 +29,10 @@
 		<string>microphone</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>TalkNote needs access to your microphone to record your voice for real-time transcription and translation between multiple languages. Your audio is processed securely and only used for translation purposes.</string>
+	<string>This app requires microphone access to record and transcribe your voice for real-time translation between languages.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>TalkNote uses speech recognition to accurately convert your spoken words into text for translation between Indian languages and English. This enables seamless communication across language barriers.</string>
+	<string>This app uses speech recognition to convert your spoken words into text for accurate translation.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>NSNetworkVolumesUsageDescription</key>
-	<string>TalkNote connects to secure Azure translation services to provide accurate translations.</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<false/>
-	</dict>
 </dict>
 </plist>

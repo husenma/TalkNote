@@ -49,8 +49,18 @@ struct ContentView: View {
         }
         .navigationViewStyle(.stack)
         .onAppear {
-            Task {
-                await permissionManager.requestAllPermissions()
+            // Initial permission check
+            permissionManager.checkCurrentPermissions()
+            
+            // Only request permissions if they haven't been requested yet
+            if !permissionManager.hasRequestedPermissions && 
+               (permissionManager.microphonePermission == .undetermined || 
+                permissionManager.speechPermission == .notDetermined) {
+                Task {
+                    // Add a small delay to ensure UI is fully loaded
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    await permissionManager.requestAllPermissions()
+                }
             }
         }
         .alert("Permissions Required", isPresented: $permissionManager.showingPermissionAlert) {

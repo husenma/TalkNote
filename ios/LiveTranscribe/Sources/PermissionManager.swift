@@ -10,26 +10,63 @@ final class PermissionManager: ObservableObject {
     @Published var speechPermission: SFSpeechRecognizerAuthorizationStatus = .notDetermined
     @Published var permissionsGranted: Bool = false
     @Published var showingPermissionAlert: Bool = false
+    @Published var hasRequestedPermissions: Bool = false
+    
+    private var permissionCheckTimer: Timer?
     
     init() {
         checkCurrentPermissions()
+        setupPermissionMonitoring()
+    }
+    
+    deinit {
+        permissionCheckTimer?.invalidate()
+    }
+    
+    /// Set up continuous permission monitoring
+    private func setupPermissionMonitoring() {
+        permissionCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task { @MainActor in
+                self.checkCurrentPermissions()
+            }
+        }
     }
     
     /// Check current permission states
     func checkCurrentPermissions() {
-        microphonePermission = AVAudioSession.sharedInstance().recordPermission
-        speechPermission = SFSpeechRecognizer.authorizationStatus()
-        updatePermissionsStatus()
+        let newMicPermission = AVAudioSession.sharedInstance().recordPermission
+        let newSpeechPermission = SFSpeechRecognizer.authorizationStatus()
+        
+        if microphonePermission != newMicPermission || speechPermission != newSpeechPermission {
+            microphonePermission = newMicPermission
+            speechPermission = newSpeechPermission
+            updatePermissionsStatus()
+            
+            // Debug log permission changes
+            PermissionDebugger.shared.logPermissionStates()
+        }
+    }
+    
+    /// Validate permissions before any audio operation
+    func validatePermissionsForAudioOperation() -> Bool {
+        checkCurrentPermissions()
+        return allPermissionsGranted
     }
     
     /// Request all required permissions sequentially
     func requestAllPermissions() async {
+        hasRequestedPermissions = true
+        
         await requestMicrophonePermission()
         if microphonePermission == .granted {
             await requestSpeechPermission()
         }
         
-        if !permissionsGranted {
+        // Give some time for permission changes to propagate
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        checkCurrentPermissions()
+        
+        if !permissionsGranted && hasRequestedPermissions {
             showingPermissionAlert = true
         }
     }
