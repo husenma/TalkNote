@@ -10,8 +10,8 @@ final class TranscriptionViewModel: ObservableObject {
     @Published var sourceLanguage: String = "hi" // Default to Hindi for Indian users
     
     // Enhanced language support with Indian languages
-    let supportedTargets = ["en", "hi", "bn", "ta", "te", "mr", "gu", "kn", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
-    let supportedSources = ["hi", "bn", "ta", "te", "mr", "gu", "kn", "en", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
+    let supportedTargets = ["en", "hi", "bn", "ta", "te", "mr", "gu", "kn", "ur", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
+    let supportedSources = ["hi", "bn", "ta", "te", "mr", "gu", "kn", "ur", "en", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
 
     private lazy var audio = AudioEngine()
     private lazy var speech = SpeechService()

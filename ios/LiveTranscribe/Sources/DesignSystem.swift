@@ -292,6 +292,7 @@ struct LanguagePickerCard: View {
             "mr": "🇮🇳 Marathi",
             "gu": "🇮🇳 Gujarati",
             "kn": "🇮🇳 Kannada",
+            "ur": "🇵🇰 Urdu",
             "es": "🇪🇸 Spanish",
             "fr": "🇫🇷 French", 
             "de": "🇩🇪 German",

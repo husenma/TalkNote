@@ -22,11 +22,12 @@ struct ContentView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                .ignoresSafeArea()
+                .ignoresSafeArea(.all)
                 
                 VStack(spacing: TalkNoteDesign.Spacing.lg) {
                     // Header with security status
                     headerView
+                        .padding(.top, TalkNoteDesign.Spacing.md)
                     
                     // Main transcription area
                     transcriptionAreaView
@@ -37,6 +38,7 @@ struct ContentView: View {
                     
                     // Main control button
                     microphoneButtonView
+                        .padding(.bottom, TalkNoteDesign.Spacing.md)
                     
                     // Recording indicator
                     if vm.isTranscribing {

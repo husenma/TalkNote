@@ -91,10 +91,17 @@ public class SecurityManager: ObservableObject {
     // MARK: - Runtime Application Self-Protection (RASP)
     
     func detectRuntimeThreats() async {
-        // Anti-debugging
+        // Anti-debugging (only in production builds)
+        #if !DEBUG
         if await isDebuggingDetected() {
             await handleSecurityThreat(.debuggerAttached)
         }
+        #else
+        // In debug mode, just log the detection
+        if await isDebuggingDetected() {
+            print("🚨 Security threat detected: debuggerAttached (ignored in debug mode)")
+        }
+        #endif
         
         // Memory protection
         await protectSensitiveMemory()
