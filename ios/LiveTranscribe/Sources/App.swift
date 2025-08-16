@@ -7,11 +7,11 @@ struct LiveTranscribeApp: App {
     init() {
         // Debug permission states on app launch
         PermissionDebugger.shared.logPermissionStates()
-        PermissionDebugger.shared.validateInfoPlistKeys()
+        let _ = PermissionDebugger.shared.validateInfoPlistKeys() // Explicitly use the result
         
         // Request permissions immediately on app launch
-        Task {
-            await requestPermissionsImmediately()
+        Task { @MainActor in
+            await Self.requestPermissionsImmediately()
         }
     }
     
@@ -22,7 +22,7 @@ struct LiveTranscribeApp: App {
     }
     
     @MainActor
-    private func requestPermissionsImmediately() async {
+    private static func requestPermissionsImmediately() async {
         // Request microphone permission first
         if #available(iOS 17.0, *) {
             AVAudioApplication.requestRecordPermission { granted in
