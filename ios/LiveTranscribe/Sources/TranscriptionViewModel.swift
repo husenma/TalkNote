@@ -33,11 +33,13 @@ class TranscriptionViewModel: ObservableObject {
     private let indianLanguageML = IndianLanguageMLModel()
     private let enhancedRL: EnhancedReinforcementLearningEngine
     private var currentTranscriptionContext: TranscriptionContext
+    private var sessionStartTime = Date()
     
     init() {
         // Initialize transcription context
         let calendar = Calendar.current
         let now = Date()
+        sessionStartTime = now
         currentTranscriptionContext = TranscriptionContext(
             timeOfDay: calendar.component(.hour, from: now),
             dayOfWeek: calendar.component(.weekday, from: now),
@@ -110,7 +112,12 @@ class TranscriptionViewModel: ObservableObject {
         }
         
         do {
-            try await audioEngine.startRecording()
+            // Use the correct method name from AudioEngine
+            audioEngine.startStreaming { [weak self] buffer, time in
+                guard let self = self else { return }
+                // Process audio buffer for speech recognition
+                self.speechTask?.request?.append(buffer)
+            }
             
             await MainActor.run {
                 self.statusMessage = "Recording..."
@@ -127,7 +134,7 @@ class TranscriptionViewModel: ObservableObject {
     }
     
     func stop() async {
-        await audioEngine.stopRecording()
+        audioEngine.stop() // Use correct method name
         speechTask?.cancel()
         
         await MainActor.run {
@@ -144,8 +151,20 @@ class TranscriptionViewModel: ObservableObject {
         }
         
         do {
-            let result = try await speechService.startContinuousRecognition()
-            await processTranscriptionResult(result)
+            // Use the correct method from SpeechService
+            speechService.start(onResult: { [weak self] text, isFinal, detectedLanguage in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    self.transcribedText = text
+                    self.displayText = text
+                    self.debugStatus = "Azure: \(text.prefix(30))..."
+                    
+                    if isFinal {
+                        await self.processTranscriptionResult(text)
+                    }
+                }
+            })
+            
         } catch {
             await MainActor.run {
                 self.debugStatus = "Azure failed, using Apple Speech..."
@@ -222,8 +241,11 @@ class TranscriptionViewModel: ObservableObject {
             await translateText(result)
         }
         
-        // Store for reinforcement learning
-        await learningStore.recordInteraction(
+        // Store for learning (add missing method to UserLearningStore)
+        learningStore.addPhrase(result)
+        
+        // Also store for reinforcement learning
+        await storeForReinforcementLearning(
             originalText: result,
             detectedLanguage: enhancedPrediction.language,
             translatedText: translatedText
@@ -235,21 +257,35 @@ class TranscriptionViewModel: ObservableObject {
             self.debugStatus = "Translating text..."
         }
         
-        do {
-            let translated = try await translatorService.translate(text: text, to: "en")
-            await MainActor.run {
-                self.translatedText = translated
-                self.debugStatus = "Translation complete"
-            }
-        } catch {
-            await MainActor.run {
-                self.translatedText = "Translation failed"
-                self.debugStatus = "Translation error"
+            do {
+                let translated = try await translatorService.translate(text: text, to: "en")
+                await MainActor.run {
+                    self.translatedText = translated
+                    self.debugStatus = "Translation complete"
+                }
+            } catch {
+                await MainActor.run {
+                    self.translatedText = "Translation failed"
+                    self.debugStatus = "Translation error"
+                }
             }
         }
-    }
-    
-    private func detectLanguageHeuristically(text: String) -> String {
+        
+        private func storeForReinforcementLearning(
+            originalText: String,
+            detectedLanguage: String,
+            translatedText: String
+        ) async {
+            // Store interaction data for RL learning
+            // This replaces the missing recordInteraction method
+            await enhancedRL.recordUserCorrection(
+                originalText: originalText,
+                detectedLanguage: detectedLanguage,
+                correctLanguage: detectedLanguage, // Assuming correct for now
+                confidence: 0.8,
+                context: currentTranscriptionContext
+            )
+        }    private func detectLanguageHeuristically(text: String) -> String {
         let supportedLanguages = ["en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "hi", "ur", "bn", "te", "mr", "ta", "gu", "kn", "ml", "or", "pa", "as", "ne", "sd", "sa"]
         
         // Indian Languages Character Detection
@@ -401,15 +437,14 @@ class TranscriptionViewModel: ObservableObject {
             }
             
             // Try to force start the audio engine
-            do {
-                try await audioEngine.startRecording()
-                await MainActor.run {
-                    self.debugStatus = "Force start: Audio engine activated"
-                }
-            } catch {
-                await MainActor.run {
-                    self.debugStatus = "Force start: Audio engine failed"
-                }
+            audioEngine.startStreaming { [weak self] buffer, time in
+                guard let self = self else { return }
+                // Process audio buffer
+                self.speechTask?.request?.append(buffer)
+            }
+            
+            await MainActor.run {
+                self.debugStatus = "Force start: Audio engine activated"
             }
         }
     }
@@ -437,7 +472,7 @@ class TranscriptionViewModel: ObservableObject {
                     timeOfDay: Calendar.current.component(.hour, from: Date()),
                     dayOfWeek: Calendar.current.component(.weekday, from: Date()),
                     previousLanguage: correctLanguage,
-                    sessionLength: Date().timeIntervalSince(Date()), // Simplified
+                    sessionLength: Date().timeIntervalSince(self.sessionStartTime),
                     backgroundNoise: .moderate
                 )
             }
@@ -456,19 +491,5 @@ class TranscriptionViewModel: ObservableObject {
                 self.statusMessage = "Learning data reset"
             }
         }
-    }
-}
-
-// MARK: - ReinforcementLearningEngine
-class ReinforcementLearningEngine {
-    func updateModel(originalText: String, detectedLanguage: String, translatedText: String) {
-        // Placeholder for reinforcement learning implementation
-        // This would analyze user corrections and improve detection accuracy
-    }
-    
-    func getPredictedLanguage(for text: String) -> String {
-        // Placeholder for ML-based language prediction
-        // This would use trained model to predict language
-        return "en"
     }
 }

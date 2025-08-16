@@ -68,4 +68,18 @@ final class AudioEngine {
         isEngineStarted = false
         try? AVAudioSession.sharedInstance().setActive(false)
     }
+    
+    // Backward compatibility methods
+    func startRecording() async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            startStreaming { buffer, time in
+                // Just start streaming, resume continuation immediately
+            }
+            continuation.resume()
+        }
+    }
+    
+    func stopRecording() async {
+        stop()
+    }
 }

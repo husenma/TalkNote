@@ -50,6 +50,17 @@ final class SpeechService {
         task = nil
         request = nil
     }
+    
+    // Method for continuous recognition (backward compatibility)
+    func startContinuousRecognition() async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            start(onResult: { text, isFinal, detectedLanguage in
+                if isFinal {
+                    continuation.resume(returning: text)
+                }
+            })
+        }
+    }
 
     private static func detectLanguage(for text: String) -> String? {
         guard !text.isEmpty else { return nil }
