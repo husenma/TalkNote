@@ -38,9 +38,15 @@ final class TranscriptionViewModel: ObservableObject {
         // Check permissions before starting
         let micPermissionGranted: Bool
         if #available(iOS 17.0, *) {
-            micPermissionGranted = AVAudioApplication.shared.recordPermission == .granted
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted: micPermissionGranted = true
+            default: micPermissionGranted = false
+            }
         } else {
-            micPermissionGranted = AVAudioSession.sharedInstance().recordPermission == .granted
+            switch AVAudioSession.sharedInstance().recordPermission {
+            case .granted: micPermissionGranted = true
+            default: micPermissionGranted = false
+            }
         }
         
         guard micPermissionGranted,

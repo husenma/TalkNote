@@ -9,9 +9,15 @@ final class AudioEngine {
         // First check if we have microphone permission
         let hasPermission: Bool
         if #available(iOS 17.0, *) {
-            hasPermission = AVAudioApplication.shared.recordPermission == .granted
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted: hasPermission = true
+            default: hasPermission = false
+            }
         } else {
-            hasPermission = AVAudioSession.sharedInstance().recordPermission == .granted
+            switch AVAudioSession.sharedInstance().recordPermission {
+            case .granted: hasPermission = true
+            default: hasPermission = false
+            }
         }
         
         guard hasPermission else {

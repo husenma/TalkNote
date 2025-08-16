@@ -3,10 +3,17 @@ import AVFoundation
 import Speech
 import UIKit
 
+/// Unified permission state for cross-platform compatibility
+enum UnifiedRecordPermission: Equatable {
+    case undetermined
+    case granted
+    case denied
+}
+
 /// PermissionManager handles all app permissions and user authorization states
 @MainActor
 final class PermissionManager: ObservableObject {
-    @Published var microphonePermission: AVAudioSession.RecordPermission = .undetermined
+    @Published var microphonePermission: UnifiedRecordPermission = .undetermined
     @Published var speechPermission: SFSpeechRecognizerAuthorizationStatus = .notDetermined
     @Published var permissionsGranted: Bool = false
     @Published var showingPermissionAlert: Bool = false
@@ -34,11 +41,29 @@ final class PermissionManager: ObservableObject {
     
     /// Check current permission states
     func checkCurrentPermissions() {
-        let newMicPermission: AVAudioSession.RecordPermission
+        let newMicPermission: UnifiedRecordPermission
         if #available(iOS 17.0, *) {
-            newMicPermission = AVAudioApplication.shared.recordPermission
+            switch AVAudioApplication.shared.recordPermission {
+            case .undetermined:
+                newMicPermission = .undetermined
+            case .granted:
+                newMicPermission = .granted
+            case .denied:
+                newMicPermission = .denied
+            @unknown default:
+                newMicPermission = .undetermined
+            }
         } else {
-            newMicPermission = AVAudioSession.sharedInstance().recordPermission
+            switch AVAudioSession.sharedInstance().recordPermission {
+            case .undetermined:
+                newMicPermission = .undetermined
+            case .granted:
+                newMicPermission = .granted
+            case .denied:
+                newMicPermission = .denied
+            @unknown default:
+                newMicPermission = .undetermined
+            }
         }
         
         let newSpeechPermission = SFSpeechRecognizer.authorizationStatus()
@@ -61,14 +86,7 @@ final class PermissionManager: ObservableObject {
     
     /// Check if all required permissions are granted
     var allPermissionsGranted: Bool {
-        let micPermissionGranted: Bool
-        if #available(iOS 17.0, *) {
-            micPermissionGranted = microphonePermission == .granted
-        } else {
-            micPermissionGranted = microphonePermission == .granted
-        }
-        
-        return micPermissionGranted && speechPermission == .authorized
+        return microphonePermission == .granted && speechPermission == .authorized
     }
     
     /// Request all required permissions sequentially
