@@ -229,7 +229,7 @@ public class SecurityManager: ObservableObject {
     
     private func setupSecurity() {
         Task {
-            await verifyAppIntegrity()
+            let _ = await verifyAppIntegrity()
             await detectRuntimeThreats()
             
             // Start continuous monitoring

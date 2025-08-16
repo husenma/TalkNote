@@ -197,7 +197,7 @@ struct MicrophoneButton: View {
                 pulseAnimation = true
             }
         }
-        .onChange(of: isRecording) { newValue in
+        .onChange(of: isRecording) { _, newValue in
             withAnimation(.easeInOut(duration: 0.3)) {
                 if newValue {
                     pulseAnimation = true
@@ -364,7 +364,7 @@ struct WaveFormView: View {
                 startAnimation()
             }
         }
-        .onChange(of: isActive) { newValue in
+        .onChange(of: isActive) { _, newValue in
             if newValue {
                 startAnimation()
             } else {

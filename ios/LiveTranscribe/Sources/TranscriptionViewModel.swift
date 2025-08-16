@@ -91,7 +91,7 @@ final class TranscriptionViewModel: ObservableObject {
                         originalText: text,
                         proposedTranslation: translated,
                         confidence: 0.8, // Default confidence from Azure
-                        languageCode: detectedLang ?? self.sourceLanguage,
+                        languageCode: detectedLang,
                         audioFeatures: audioFeatures,
                         userContext: userContext
                     )

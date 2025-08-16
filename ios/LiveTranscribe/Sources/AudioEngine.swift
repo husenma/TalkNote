@@ -58,13 +58,8 @@ final class AudioEngine {
 
     func stop() {
         // Safely remove tap - AVAudioInputNode doesn't have numberOfTaps property
-        // We'll use a try-catch approach to safely remove taps
-        do {
-            engine.inputNode.removeTap(onBus: bus)
-        } catch {
-            // Tap might not exist, which is fine
-            print("No tap to remove or tap removal failed: \(error)")
-        }
+        // We'll safely remove the tap without try-catch since removeTap doesn't throw
+        engine.inputNode.removeTap(onBus: bus)
         
         if engine.isRunning {
             engine.stop()
