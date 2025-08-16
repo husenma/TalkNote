@@ -12,12 +12,17 @@ let package = Package(
             targets: ["LiveTranscribe"])
     ],
     dependencies: [
-        // Add any external dependencies here if needed
+        // ML and NLP dependencies
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.0.0"),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", from: "0.1.0")
     ],
     targets: [
         .executableTarget(
             name: "LiveTranscribe",
-            dependencies: [],
+            dependencies: [
+                .product(name: "Collections", package: "swift-collections"),
+                .product(name: "Transformers", package: "swift-transformers")
+            ],
             path: "Sources",
             resources: [
                 .process("Resources")

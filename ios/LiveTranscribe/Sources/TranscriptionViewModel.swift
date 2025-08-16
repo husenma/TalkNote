@@ -1,233 +1,474 @@
-import Foundation
+import SwiftUI
 import AVFoundation
 import Speech
 
 @MainActor
-final class TranscriptionViewModel: ObservableObject {
-    @Published var displayText: String = ""
-    @Published var isTranscribing: Bool = false
-    @Published var targetLanguage: String = "en"
-    @Published var sourceLanguage: String = "hi" // Default to Hindi for Indian users
+class TranscriptionViewModel: ObservableObject {
+    @Published var transcribedText = ""
+    @Published var translatedText = ""
+    @Published var detectedLanguage = "Unknown"
+    @Published var isRecording = false
+    @Published var isTranscribing = false
+    @Published var isAutoPaused = false
+    @Published var autoResumeTimer: Timer?
+    @Published var statusMessage = "Ready"
+    @Published var debugStatus = "Initializing..."
+    @Published var displayText = ""
+    @Published var sourceLanguage = "Auto-detect"
+    @Published var targetLanguage = "English"
+    @Published var mlModelStatus = "Initializing ML models..."
+    @Published var learningProgress: Float = 0.0
+    @Published var predictionReasoning = ""
     
-    // Enhanced language support with Indian languages
-    let supportedTargets = ["en", "hi", "bn", "ta", "te", "mr", "gu", "kn", "ur", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
-    let supportedSources = ["hi", "bn", "ta", "te", "mr", "gu", "kn", "ur", "en", "es", "fr", "de", "zh-Hans", "ar", "ru", "ja", "ko"]
-
-    private lazy var audio = AudioEngine()
-    private lazy var speech = SpeechService()
-    private let translator = TranslatorService()
-    private let learning = UserLearningStore()
-    private let azureSpeech = AzureSpeechService()
-    private let reinforcementLearning = ReinforcementLearningEngine()
-    private var sessionStartTime: TimeInterval = 0
-
-    func requestPermissions() {
-        print("🔐 DEBUG: Requesting permissions...")
-        if #available(iOS 17.0, *) {
-            AVAudioApplication.requestRecordPermission { granted in
-                print("🎤 DEBUG: iOS 17+ Audio permission granted: \(granted)")
+    let supportedSources = ["Auto-detect", "English", "Spanish", "French", "German", "Italian", "Portuguese", "Russian", "Japanese", "Korean", "Chinese", "Arabic", "Hindi", "Urdu", "Bengali", "Telugu", "Marathi", "Tamil", "Gujarati", "Kannada", "Malayalam", "Odia", "Punjabi", "Assamese", "Nepali", "Sindhi", "Sanskrit"]
+    let supportedTargets = ["English", "Spanish", "French", "German", "Italian", "Portuguese", "Russian", "Japanese", "Korean", "Chinese", "Arabic", "Hindi", "Urdu", "Bengali", "Telugu", "Marathi", "Tamil", "Gujarati", "Kannada", "Malayalam", "Odia", "Punjabi", "Assamese", "Nepali", "Sindhi", "Sanskrit"]
+    
+    private let speechService = SpeechService()
+    private let translatorService = TranslatorService()
+    private let audioEngine = AudioEngine()
+    private var speechTask: SFSpeechRecognitionTask?
+    private let learningStore = UserLearningStore()
+    
+    // ML and Reinforcement Learning
+    private let indianLanguageML = IndianLanguageMLModel()
+    private let enhancedRL: EnhancedReinforcementLearningEngine
+    private var currentTranscriptionContext: TranscriptionContext
+    
+    init() {
+        // Initialize transcription context
+        let calendar = Calendar.current
+        let now = Date()
+        currentTranscriptionContext = TranscriptionContext(
+            timeOfDay: calendar.component(.hour, from: now),
+            dayOfWeek: calendar.component(.weekday, from: now),
+            previousLanguage: nil,
+            sessionLength: 0,
+            backgroundNoise: .moderate
+        )
+        
+        // Initialize enhanced reinforcement learning
+        enhancedRL = EnhancedReinforcementLearningEngine(mlModel: indianLanguageML)
+        
+        Task {
+            await requestPermissions()
+            await initializeMLModels()
+        }
+    }
+    
+    private func requestPermissions() async {
+        // Request microphone permission
+        let micStatus = await AVAudioSession.sharedInstance().requestRecordPermission()
+        
+        // Request speech recognition permission
+        let speechStatus = await SFSpeechRecognizer.requestAuthorization()
+        
+        if micStatus && speechStatus == .authorized {
+            await MainActor.run {
+                self.statusMessage = "Permissions granted"
+                self.debugStatus = "Ready for transcription"
             }
         } else {
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                print("🎤 DEBUG: iOS 16- Audio permission granted: \(granted)")
+            await MainActor.run {
+                self.statusMessage = "Permissions required"
+                self.debugStatus = "Need microphone and speech permissions"
             }
         }
-        SpeechService.requestAuthorization()
-        print("🗣️ DEBUG: Speech authorization requested")
     }
-
+    
+    private func initializeMLModels() async {
+        await MainActor.run {
+            self.mlModelStatus = "Downloading Indian language models..."
+        }
+        
+        // Wait for ML models to initialize
+        while !indianLanguageML.isInitialized {
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        }
+        
+        await MainActor.run {
+            self.mlModelStatus = "ML models ready"
+            self.statusMessage = "Ready with AI enhancement"
+        }
+    }
+    
     func toggle() {
-        print("🔄 DEBUG: Toggle called, current state: isTranscribing = \(isTranscribing)")
-        if isTranscribing { stop() } else { start() }
+        Task {
+            if isTranscribing {
+                await stop()
+            } else {
+                await start()
+            }
+        }
     }
-
-    func start() {
-        print("🚀 DEBUG: Start function called")
-        // Check permissions before starting
-        let micPermissionGranted: Bool
-        if #available(iOS 17.0, *) {
-            switch AVAudioApplication.shared.recordPermission {
-            case .granted: micPermissionGranted = true
-            default: micPermissionGranted = false
-            }
-        } else {
-            switch AVAudioSession.sharedInstance().recordPermission {
-            case .granted: micPermissionGranted = true
-            default: micPermissionGranted = false
-            }
+    
+    func start() async {
+        await MainActor.run {
+            self.statusMessage = "Starting transcription..."
+            self.debugStatus = "Initializing audio engine..."
+            self.isRecording = true
+            self.isTranscribing = true
         }
         
-        let speechPermissionGranted = SFSpeechRecognizer.authorizationStatus() == .authorized
-        print("🔐 DEBUG: Permissions - Mic: \(micPermissionGranted), Speech: \(speechPermissionGranted)")
+        do {
+            try await audioEngine.startRecording()
+            
+            await MainActor.run {
+                self.statusMessage = "Recording..."
+                self.debugStatus = "Audio engine started successfully"
+            }
+            
+            // Try Azure Speech Service first
+            await startAzureSpeechService()
+            
+        } catch {
+            // Fall back to Apple Speech Recognition
+            await startAppleSpeechRecognition()
+        }
+    }
+    
+    func stop() async {
+        await audioEngine.stopRecording()
+        speechTask?.cancel()
         
-        guard micPermissionGranted, speechPermissionGranted else {
-            print("❌ DEBUG: Required permissions not granted - stopping start process")
+        await MainActor.run {
+            self.isRecording = false
+            self.isTranscribing = false
+            self.statusMessage = "Stopped"
+            self.debugStatus = "Transcription stopped"
+        }
+    }
+    
+    private func startAzureSpeechService() async {
+        await MainActor.run {
+            self.debugStatus = "Trying Azure Speech Service..."
+        }
+        
+        do {
+            let result = try await speechService.startContinuousRecognition()
+            await processTranscriptionResult(result)
+        } catch {
+            await MainActor.run {
+                self.debugStatus = "Azure failed, using Apple Speech..."
+            }
+            await startAppleSpeechRecognition()
+        }
+    }
+    
+    private func startAppleSpeechRecognition() async {
+        await MainActor.run {
+            self.debugStatus = "Using Apple Speech Recognition..."
+        }
+        
+        guard let recognizer = SFSpeechRecognizer() else {
+            await MainActor.run {
+                self.statusMessage = "Speech recognition not available"
+                self.debugStatus = "SFSpeechRecognizer unavailable"
+            }
             return
         }
         
-        isTranscribing = true
-        displayText = ""
-        sessionStartTime = Date().timeIntervalSince1970
-        print("🎤 DEBUG: Starting transcription...")
-
-        // Prefer Azure Speech Translation with auto language detection when configured
-        if azureSpeech.isAvailable {
-            print("🔥 DEBUG: Using Azure Speech service")
-            azureSpeech.start(targetLanguage: targetLanguage,
-                              autoDetectLanguages: ["en-US","es-ES","fr-FR","de-DE","hi-IN","bn-IN","ta-IN","te-IN","mr-IN","gu-IN","kn-IN","ar-SA","ru-RU","ja-JP","ko-KR","zh-CN"],
-                              phrases: learning.currentPhrases) { [weak self] text, isFinal, detectedLang in
-                guard let self else { return }
-                Task { @MainActor in
-                    print("🎯 DEBUG: Azure speech result: '\(text)', isFinal: \(isFinal)")
-                    if self.displayText.isEmpty { self.displayText = text } else { self.displayText += (text.isEmpty ? "" : " " + text) }
-                    print("📝 DEBUG: displayText updated to: '\(self.displayText)'")
-                }
-                }
-            }
-            // No need to stream audio manually; Azure SDK handles mic capture via SPXAudioConfiguration
-            return
-        }
-
-        // Fallback: Apple Speech + Azure Translator with RL enhancement
-        print("🍎 DEBUG: Using Apple Speech service (Azure not available)")
-        speech.start(onResult: { [weak self] text, isFinal, detectedLang in
-            guard let self else { return }
-            print("🎯 DEBUG: Apple speech result: '\(text)', isFinal: \(isFinal), detected: \(detectedLang)")
-            Task { @MainActor in
-                do {
-                    let translated = try await self.translator.translate(text: text, from: detectedLang, to: self.targetLanguage)
-                    print("🌐 DEBUG: Translation result: '\(translated)'")
-                    
-                    // Enhance translation with reinforcement learning
-                    let audioFeatures = RLAudioFeatures()
-                    let userContext = RLUserContext(
-                        languagePreference: self.sourceLanguage,
-                        sessionDuration: Date().timeIntervalSince1970 - self.sessionStartTime
-                    )
-                    
-                    let optimizedTranslation = self.reinforcementLearning.optimizeTranslation(
-                        originalText: text,
-                        proposedTranslation: translated,
-                        confidence: 0.8, // Default confidence from Azure
-                        languageCode: detectedLang,
-                        audioFeatures: audioFeatures,
-                        userContext: userContext
-                    )
-                    print("🧠 DEBUG: RL optimized translation: '\(optimizedTranslation)'")
-                    
-                    if self.displayText.isEmpty {
-                        self.displayText = optimizedTranslation
-                    } else if isFinal {
-                        self.displayText += (translated.hasSuffix(" ") ? translated : " " + translated)
-                    } else {
-                        // Show partial inline (optional). Keep UI simple: append preview with ellipsis
-                        self.displayText += " " + translated
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        
+        do {
+            speechTask = try await recognizer.recognitionTask(with: request) { result, error in
+                if let result = result {
+                    Task { @MainActor in
+                        self.transcribedText = result.bestTranscription.formattedString
+                        self.displayText = result.bestTranscription.formattedString
+                        self.debugStatus = "Transcribing: \(result.bestTranscription.formattedString.prefix(30))..."
+                        
+                        if result.isFinal {
+                            await self.translateText(result.bestTranscription.formattedString)
+                        }
                     }
-                    print("📝 DEBUG: Final displayText: '\(self.displayText)'")
-                } catch {
-                    // Ignore translation errors; keep raw text
-                    print("❌ DEBUG: Translation error: \(error), using raw text: '\(text)'")
-                    if self.displayText.isEmpty { self.displayText = text } else { self.displayText += " " + text }
-                    print("📝 DEBUG: displayText (raw): '\(self.displayText)'")
+                }
+                
+                if let error = error {
+                    Task { @MainActor in
+                        self.statusMessage = "Recognition error"
+                        self.debugStatus = "Speech recognition error"
+                    }
                 }
             }
-        }, userPhrases: learning.currentPhrases)
-
-        print("🎧 DEBUG: Starting audio streaming...")
-        audio.startStreaming { [weak self] buffer, when in
-            print("🔊 DEBUG: Audio buffer received, size: \(buffer.frameLength)")
-            self?.speech.append(buffer: buffer)
+        } catch {
+            await MainActor.run {
+                self.statusMessage = "Failed to start recognition"
+                self.debugStatus = "Failed to start Apple Speech"
+            }
         }
     }
-
-    func stop() {
-        print("⏹️ DEBUG: Stopping transcription...")
-        isTranscribing = false
-        audio.stop()
-        Task { await speech.shutdown() }
-        print("🔇 DEBUG: Transcription stopped, final text: '\(displayText)'")
+    
+    private func processTranscriptionResult(_ result: String) async {
+        await MainActor.run {
+            self.transcribedText = result
+            self.displayText = result
+            self.debugStatus = "Processing: \(result.prefix(30))..."
+        }
+        
+        // Enhanced ML language detection
+        let enhancedPrediction = await enhancedRL.getPredictedLanguageWithRL(
+            for: result,
+            context: currentTranscriptionContext
+        )
+        
+        await MainActor.run {
+            self.detectedLanguage = enhancedPrediction.language
+            self.predictionReasoning = enhancedPrediction.reasoning
+        }
+        
+        // Translate if not English
+        if enhancedPrediction.language != "en" {
+            await translateText(result)
+        }
+        
+        // Store for reinforcement learning
+        await learningStore.recordInteraction(
+            originalText: result,
+            detectedLanguage: enhancedPrediction.language,
+            translatedText: translatedText
+        )
     }
     
-    // MARK: - Reinforcement Learning Feedback
+    private func translateText(_ text: String) async {
+        await MainActor.run {
+            self.debugStatus = "Translating text..."
+        }
+        
+        do {
+            let translated = try await translatorService.translate(text: text, to: "en")
+            await MainActor.run {
+                self.translatedText = translated
+                self.debugStatus = "Translation complete"
+            }
+        } catch {
+            await MainActor.run {
+                self.translatedText = "Translation failed"
+                self.debugStatus = "Translation error"
+            }
+        }
+    }
     
-    func provideFeedback(isPositive: Bool, correctedText: String? = nil) {
-        guard !displayText.isEmpty else { return }
+    private func detectLanguageHeuristically(text: String) -> String {
+        let supportedLanguages = ["en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "hi", "ur", "bn", "te", "mr", "ta", "gu", "kn", "ml", "or", "pa", "as", "ne", "sd", "sa"]
         
-        let reward = ReinforcementLearningEngine.Reward(
-            value: isPositive ? 1.0 : -1.0,
-            feedback: correctedText != nil ? .userCorrection : (isPositive ? .userApproval : .implicitNegative),
-            context: "User feedback on translation"
-        )
+        // Indian Languages Character Detection
+        // Hindi (Devanagari script)
+        if text.range(of: "[\\u0900-\\u097F]", options: .regularExpression) != nil {
+            return "hi"
+        }
         
-        // Create a translation action for the current text
-        let translationAction = ReinforcementLearningEngine.TranslationAction(
-            sourceText: displayText, // Simplified - in production, track original
-            translatedText: displayText,
-            confidence: 0.8,
-            languageCode: sourceLanguage,
-            audioFeatures: RLAudioFeatures(),
-            timestamp: Date()
-        )
+        // Bengali (Bengali script)
+        if text.range(of: "[\\u0980-\\u09FF]", options: .regularExpression) != nil {
+            return "bn"
+        }
         
-        reinforcementLearning.processFeedback(
-            originalAction: translationAction,
-            feedback: reward,
-            correctedTranslation: correctedText
-        )
+        // Telugu (Telugu script)
+        if text.range(of: "[\\u0C00-\\u0C7F]", options: .regularExpression) != nil {
+            return "te"
+        }
+        
+        // Marathi (Devanagari script - same as Hindi but context-based)
+        if text.range(of: "[\\u0900-\\u097F]", options: .regularExpression) != nil {
+            // Additional Marathi-specific patterns could be added here
+            return "mr"
+        }
+        
+        // Tamil (Tamil script)
+        if text.range(of: "[\\u0B80-\\u0BFF]", options: .regularExpression) != nil {
+            return "ta"
+        }
+        
+        // Gujarati (Gujarati script)
+        if text.range(of: "[\\u0A80-\\u0AFF]", options: .regularExpression) != nil {
+            return "gu"
+        }
+        
+        // Kannada (Kannada script)
+        if text.range(of: "[\\u0C80-\\u0CFF]", options: .regularExpression) != nil {
+            return "kn"
+        }
+        
+        // Malayalam (Malayalam script)
+        if text.range(of: "[\\u0D00-\\u0D7F]", options: .regularExpression) != nil {
+            return "ml"
+        }
+        
+        // Odia/Oriya (Odia script)
+        if text.range(of: "[\\u0B00-\\u0B7F]", options: .regularExpression) != nil {
+            return "or"
+        }
+        
+        // Punjabi (Gurmukhi script)
+        if text.range(of: "[\\u0A00-\\u0A7F]", options: .regularExpression) != nil {
+            return "pa"
+        }
+        
+        // Assamese (Bengali script - similar to Bengali)
+        if text.range(of: "[\\u0980-\\u09FF]", options: .regularExpression) != nil {
+            return "as"
+        }
+        
+        // Urdu (Arabic script with additional characters)
+        if text.range(of: "[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF]", options: .regularExpression) != nil {
+            return "ur"
+        }
+        
+        // Sanskrit (Devanagari script)
+        if text.range(of: "[\\u0900-\\u097F]", options: .regularExpression) != nil {
+            return "sa"
+        }
+        
+        // Nepali (Devanagari script)
+        if text.range(of: "[\\u0900-\\u097F]", options: .regularExpression) != nil {
+            return "ne"
+        }
+        
+        // Sindhi (Arabic script variant)
+        if text.range(of: "[\\u0600-\\u06FF]", options: .regularExpression) != nil {
+            return "sd"
+        }
+        
+        // Other Major Languages
+        // Arabic
+        if text.range(of: "[\\u0600-\\u06FF]", options: .regularExpression) != nil {
+            return "ar"
+        }
+        
+        // Hebrew
+        if text.range(of: "[\\u0590-\\u05FF]", options: .regularExpression) != nil {
+            return "he"
+        }
+        
+        // Chinese (Han characters)
+        if text.range(of: "[\\u4E00-\\u9FFF]", options: .regularExpression) != nil {
+            return "zh"
+        }
+        
+        // Japanese (Hiragana, Katakana)
+        if text.range(of: "[\\u3040-\\u309F\\u30A0-\\u30FF]", options: .regularExpression) != nil {
+            return "ja"
+        }
+        
+        // Korean (Hangul)
+        if text.range(of: "[\\uAC00-\\uD7FF]", options: .regularExpression) != nil {
+            return "ko"
+        }
+        
+        // Russian (Cyrillic)
+        if text.range(of: "[\\u0400-\\u04FF]", options: .regularExpression) != nil {
+            return "ru"
+        }
+        
+        // Default to English if no specific patterns found
+        return "en"
+    }
+    
+    func testTranscription() {
+        Task {
+            await MainActor.run {
+                self.transcribedText = "नमस्ते, मैं हिंदी बोल रहा हूँ"
+                self.translatedText = "Hello, I am speaking Hindi"
+                self.displayText = "नमस्ते, मैं हिंदी बोल रहा हूँ"
+                self.detectedLanguage = "Hindi"
+                self.statusMessage = "Test completed"
+                self.debugStatus = "Hindi test transcription displayed"
+            }
+        }
     }
     
     func clearText() {
-        displayText = ""
-    }
-    
-    func shareText() {
-        // Share functionality - can be implemented later
-    }
-    
-    // MARK: - Test Mode
-    func testTranscription() {
-        print("🧪 DEBUG: Test mode activated")
-        isTranscribing = true
-        displayText = "Test: This is a sample transcription to verify the UI is working correctly."
-        
-        // Simulate ongoing transcription updates
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            if self.isTranscribing {
-                self.displayText += " Adding more text to test live updates..."
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            if self.isTranscribing {
-                self.displayText += " Final test message. If you see this, the transcription system is working!"
+        Task {
+            await MainActor.run {
+                self.transcribedText = ""
+                self.translatedText = ""
+                self.displayText = ""
+                self.statusMessage = "Cleared"
+                self.debugStatus = "Text cleared"
             }
         }
     }
     
-    // Force start with minimal checks
     func forceStart() {
-        print("🔥 DEBUG: Force starting transcription with minimal checks...")
-        isTranscribing = true
-        displayText = "Force started - waiting for audio..."
-        sessionStartTime = Date().timeIntervalSince1970
-        
-        // Use Apple Speech as it's more reliable
-        speech.start(onResult: { [weak self] text, isFinal, detectedLang in
-            guard let self else { return }
-            print("🎯 DEBUG: Force mode - speech result: '\(text)'")
-            Task { @MainActor in
-                if self.displayText.contains("Force started") {
-                    self.displayText = text
-                } else {
-                    self.displayText += " " + text
-                }
-                print("📝 DEBUG: Force mode - displayText: '\(self.displayText)'")
+        Task {
+            await MainActor.run {
+                self.isRecording = true
+                self.isTranscribing = true
+                self.statusMessage = "Force started"
+                self.debugStatus = "Force start initiated"
+                self.transcribedText = "Force start activated - microphone should be active"
+                self.displayText = "Force start activated - microphone should be active"
             }
-        }, userPhrases: [])
-
-        audio.startStreaming { [weak self] buffer, when in
-            print("🔊 DEBUG: Force mode - audio buffer: \(buffer.frameLength)")
-            self?.speech.append(buffer: buffer)
+            
+            // Try to force start the audio engine
+            do {
+                try await audioEngine.startRecording()
+                await MainActor.run {
+                    self.debugStatus = "Force start: Audio engine activated"
+                }
+            } catch {
+                await MainActor.run {
+                    self.debugStatus = "Force start: Audio engine failed"
+                }
+            }
         }
+    }
+    
+    // MARK: - User Feedback for Reinforcement Learning
+    func correctLanguageDetection(correctLanguage: String) {
+        Task {
+            guard !transcribedText.isEmpty else { return }
+            
+            await enhancedRL.recordUserCorrection(
+                originalText: transcribedText,
+                detectedLanguage: detectedLanguage,
+                correctLanguage: correctLanguage,
+                confidence: 0.8, // Placeholder confidence
+                context: currentTranscriptionContext
+            )
+            
+            await MainActor.run {
+                self.detectedLanguage = correctLanguage
+                self.learningProgress = enhancedRL.learningProgress
+                self.statusMessage = "Thank you for the correction!"
+                
+                // Update context for next prediction
+                self.currentTranscriptionContext = TranscriptionContext(
+                    timeOfDay: Calendar.current.component(.hour, from: Date()),
+                    dayOfWeek: Calendar.current.component(.weekday, from: Date()),
+                    previousLanguage: correctLanguage,
+                    sessionLength: Date().timeIntervalSince(Date()), // Simplified
+                    backgroundNoise: .moderate
+                )
+            }
+        }
+    }
+    
+    func getLearningStats() -> LearningStats {
+        return enhancedRL.getLearningStats()
+    }
+    
+    func resetLearning() {
+        enhancedRL.resetLearning()
+        Task {
+            await MainActor.run {
+                self.learningProgress = 0.0
+                self.statusMessage = "Learning data reset"
+            }
+        }
+    }
+}
+
+// MARK: - ReinforcementLearningEngine
+class ReinforcementLearningEngine {
+    func updateModel(originalText: String, detectedLanguage: String, translatedText: String) {
+        // Placeholder for reinforcement learning implementation
+        // This would analyze user corrections and improve detection accuracy
+    }
+    
+    func getPredictedLanguage(for text: String) -> String {
+        // Placeholder for ML-based language prediction
+        // This would use trained model to predict language
+        return "en"
     }
 }
