@@ -54,7 +54,9 @@ struct ContentView: View {
                     Button("Clear") {
                         vm.clearText()
                         if vm.isTranscribing {
-                            vm.stop()
+                            Task {
+                                await vm.stop()
+                            }
                         }
                     }
                     .buttonStyle(SecondaryButtonStyle())
