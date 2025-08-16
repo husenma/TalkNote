@@ -162,10 +162,10 @@ class IndianLanguageMLModel: ObservableObject {
             // Tokenize text for BERT input
             let tokenizedInput = tokenizeForBERT(text: text)
             let input = try MLDictionaryFeatureProvider(dictionary: tokenizedInput)
-            let prediction = try model.prediction(from: input)
-            
+            let prediction = try await model.prediction(from: input)
+
             return extractLanguageScores(from: prediction)
-            
+
         } catch {
             await updateStatus("IndicBERT prediction failed: \(error.localizedDescription)")
             return nil
@@ -210,19 +210,17 @@ class IndianLanguageMLModel: ObservableObject {
     
     private func generateEmbeddings(text: String, model: MLModel) async throws -> [Float] {
         let input = try MLDictionaryFeatureProvider(dictionary: ["text": text])
-        let prediction = try model.prediction(from: input)
-        
+        let prediction = try await model.prediction(from: input)
+
         if let embeddings = prediction.featureValue(for: "embeddings")?.multiArrayValue {
             return embeddings.dataPointer.assumingMemoryBound(to: Float.self)
                 .withMemoryRebound(to: Float.self, capacity: embeddings.count) { pointer in
                     Array(UnsafeBufferPointer(start: pointer, count: embeddings.count))
                 }
         }
-        
+
         return []
-    }
-    
-    private func classifyFromEmbeddings(_ embeddings: [Float]) -> [String: Float] {
+    }    private func classifyFromEmbeddings(_ embeddings: [Float]) -> [String: Float] {
         // Use cosine similarity with pre-computed language embeddings
         let languageEmbeddings = getLanguageEmbeddings()
         var scores: [String: Float] = [:]
