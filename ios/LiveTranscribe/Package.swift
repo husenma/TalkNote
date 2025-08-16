@@ -4,17 +4,24 @@ import PackageDescription
 let package = Package(
     name: "LiveTranscribe",
     platforms: [
-        .iOS(.v15)
+        .iOS(.v16)
     ],
     products: [
-        .library(
+        .executable(
             name: "LiveTranscribe",
             targets: ["LiveTranscribe"])
     ],
+    dependencies: [
+        // Add any external dependencies here if needed
+    ],
     targets: [
-        .target(
+        .executableTarget(
             name: "LiveTranscribe",
-            path: "Sources"
+            dependencies: [],
+            path: "Sources",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "LiveTranscribeTests",
