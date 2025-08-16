@@ -60,14 +60,10 @@ class IndianLanguageMLModel: ObservableObject {
     
     private func initializeNaturalLanguageModel() async {
         do {
-            // Create custom language classifier for Indian languages
-            let languageConstraints = NLLanguageConstraints(allowedLanguages: [
-                .hindi, .urdu, .bengali, .tamil, .telugu, .gujarati, .kannada, 
-                .malayalam, .marathi, .punjabi, .oriya, .assamese, .nepali
-            ])
-            
-            languageClassifier = try NLModel(mlModel: createCustomLanguageModel(), configuration: nil)
-            await updateStatus("Natural Language model initialized")
+            // Use built-in NaturalLanguage framework without custom constraints
+            // We'll use NLLanguageRecognizer for basic language detection
+            // and enhance it with our ML models
+            await updateStatus("Natural Language recognizer initialized")
             
         } catch {
             await updateStatus("Failed to initialize NL model: \(error.localizedDescription)")
@@ -144,8 +140,7 @@ class IndianLanguageMLModel: ObservableObject {
     
     // MARK: - Individual Model Predictions
     private func detectWithNaturalLanguage(text: String) async -> [String: Float]? {
-        guard let classifier = languageClassifier else { return nil }
-        
+        // Use built-in NLLanguageRecognizer without custom classifier
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(text)
         
@@ -347,20 +342,10 @@ class IndianLanguageMLModel: ObservableObject {
         await loadLocalModel(name: name, path: path)
     }
     
-    private func createCustomLanguageModel() throws -> MLModel {
-        // Create a simple language classification model using CreateML
-        // This is a placeholder - in production, use properly trained models
-        
-        let dummyData = [
-            ("नमस्ते कैसे हैं आप", "hi"),
-            ("আমি ভালো আছি ধন্যবাদ", "bn"),
-            ("నేను బాగున్నాను", "te"),
-            ("நான் நலமாக இருக்கிறேன்", "ta")
-        ]
-        
-        // This would require CreateML framework setup
-        // Returning a dummy model for compilation
-        throw MLModelError.modelNotFound
+    private func createCustomLanguageModel() throws -> MLModel? {
+        // Simplified approach - return nil for now
+        // In production, this would load a pre-trained language classification model
+        return nil
     }
     
     private func extractLanguageScores(from prediction: MLFeatureProvider) -> [String: Float] {
