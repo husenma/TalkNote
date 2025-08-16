@@ -6,6 +6,7 @@ struct ContentView: View {
     @StateObject private var vm = TranscriptionViewModel()
     @StateObject private var securityManager = SecurityManager()
     @StateObject private var permissionManager = PermissionManager()
+    @StateObject private var startupPermissionManager = StartupPermissionManager()
     @State private var showingLanguageSettings = false
     @State private var showingSecuritySettings = false
 
@@ -49,18 +50,14 @@ struct ContentView: View {
         }
         .navigationViewStyle(.stack)
         .onAppear {
-            // Initial permission check
+            // Check permissions when view appears
+            startupPermissionManager.checkInitialPermissions()
             permissionManager.checkCurrentPermissions()
-            
-            // Only request permissions if they haven't been requested yet
-            if !permissionManager.hasRequestedPermissions && 
-               (permissionManager.microphonePermission == .undetermined || 
-                permissionManager.speechPermission == .notDetermined) {
-                Task {
-                    // Add a small delay to ensure UI is fully loaded
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                    await permissionManager.requestAllPermissions()
-                }
+        }
+        .onChange(of: startupPermissionManager.allPermissionsGranted) { granted in
+            if granted {
+                // Refresh permission manager when startup permissions are granted
+                permissionManager.checkCurrentPermissions()
             }
         }
         .alert("Permissions Required", isPresented: $permissionManager.showingPermissionAlert) {
@@ -77,6 +74,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingSecuritySettings) {
             SecuritySettingsView(securityManager: securityManager)
+        }
+        .fullScreenCover(isPresented: $startupPermissionManager.showingPermissionScreen) {
+            PermissionOnboardingView(permissionManager: startupPermissionManager)
         }
     }
     
@@ -99,20 +99,14 @@ struct ContentView: View {
             HStack(spacing: TalkNoteDesign.Spacing.sm) {
                 // Permission status indicator
                 Button(action: {
-                    if permissionManager.permissionsDenied {
-                        permissionManager.openAppSettings()
-                    } else if !permissionManager.allPermissionsGranted {
-                        Task {
-                            await permissionManager.requestAllPermissions()
-                        }
+                    if !startupPermissionManager.allPermissionsGranted {
+                        startupPermissionManager.showingPermissionScreen = true
                     }
                 }) {
                     HStack(spacing: 4) {
-                        Image(systemName: permissionManager.allPermissionsGranted ? "checkmark.circle.fill" : 
-                                         permissionManager.permissionsDenied ? "exclamationmark.triangle.fill" : "circle")
-                            .foregroundColor(permissionManager.allPermissionsGranted ? .green : 
-                                           permissionManager.permissionsDenied ? .orange : .gray)
-                        Text(permissionManager.shortPermissionStatus)
+                        Image(systemName: startupPermissionManager.allPermissionsGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundColor(startupPermissionManager.allPermissionsGranted ? .green : .orange)
+                        Text(startupPermissionManager.allPermissionsGranted ? "Ready to record" : "Permissions needed")
                             .font(TalkNoteDesign.Typography.caption)
                             .foregroundColor(TalkNoteDesign.Colors.textSecondary)
                     }
@@ -158,11 +152,11 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
                             if vm.displayText.isEmpty {
                                 VStack(spacing: TalkNoteDesign.Spacing.md) {
-                                    Image(systemName: !permissionManager.allPermissionsGranted ? "lock.circle" : "mic.circle")
+                                    Image(systemName: !startupPermissionManager.allPermissionsGranted ? "lock.circle" : "mic.circle")
                                         .font(.system(size: 48))
                                         .foregroundColor(TalkNoteDesign.Colors.textTertiary)
                                     
-                                    Text(!permissionManager.allPermissionsGranted ? 
+                                    Text(!startupPermissionManager.allPermissionsGranted ? 
                                          "Grant microphone and speech permissions to start" :
                                          "Tap the microphone to start speaking")
                                         .font(TalkNoteDesign.Typography.body)
@@ -225,22 +219,16 @@ struct ContentView: View {
     private var microphoneButtonView: some View {
         VStack(spacing: TalkNoteDesign.Spacing.sm) {
             MicrophoneButton(isRecording: $vm.isTranscribing, action: {
-                if permissionManager.allPermissionsGranted {
+                if startupPermissionManager.allPermissionsGranted && permissionManager.allPermissionsGranted {
                     vm.toggle()
-                } else if permissionManager.permissionsDenied {
-                    permissionManager.openAppSettings()
                 } else {
-                    Task {
-                        await permissionManager.requestAllPermissions()
-                    }
+                    startupPermissionManager.showingPermissionScreen = true
                 }
-            }, isDisabled: !permissionManager.allPermissionsGranted)
+            }, isDisabled: !startupPermissionManager.allPermissionsGranted)
             
-            Text(permissionManager.permissionsDenied ? 
-                 "Tap to open Settings" :
-                 !permissionManager.allPermissionsGranted ? 
-                 "Tap to grant permissions" :
-                 vm.isTranscribing ? "Tap to stop recording" : "Tap to start recording")
+            Text(startupPermissionManager.allPermissionsGranted ? 
+                 (vm.isTranscribing ? "Tap to stop recording" : "Tap to start recording") :
+                 "Tap to grant permissions")
                 .font(TalkNoteDesign.Typography.caption)
                 .foregroundColor(TalkNoteDesign.Colors.textSecondary)
                 .multilineTextAlignment(.center)

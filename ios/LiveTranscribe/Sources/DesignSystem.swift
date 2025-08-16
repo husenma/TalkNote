@@ -216,6 +216,7 @@ struct LanguagePickerCard: View {
     @Binding var selectedLanguage: String
     let supportedLanguages: [String]
     let title: String
+    @State private var isExpanded = false
     
     var body: some View {
         CardView {
@@ -227,13 +228,18 @@ struct LanguagePickerCard: View {
                 Menu {
                     ForEach(supportedLanguages, id: \.self) { language in
                         Button(action: {
-                            selectedLanguage = language
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedLanguage = language
+                            }
                         }) {
                             HStack {
                                 Text(getLanguageDisplayName(language))
+                                    .foregroundColor(.primary)
+                                Spacer()
                                 if selectedLanguage == language {
                                     Image(systemName: "checkmark")
                                         .foregroundColor(TalkNoteDesign.Colors.accentGreen)
+                                        .font(.system(size: 14, weight: .semibold))
                                 }
                             }
                         }
@@ -243,16 +249,33 @@ struct LanguagePickerCard: View {
                         Text(getLanguageDisplayName(selectedLanguage))
                             .font(TalkNoteDesign.Typography.callout)
                             .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            .multilineTextAlignment(.leading)
                         
                         Spacer()
                         
                         Image(systemName: "chevron.down")
-                            .font(.caption)
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            .animation(.easeInOut(duration: 0.2), value: isExpanded)
                     }
-                    .padding(TalkNoteDesign.Spacing.sm)
+                    .padding(TalkNoteDesign.Spacing.md)
                     .background(TalkNoteDesign.Colors.surfaceSecondary)
-                    .cornerRadius(TalkNoteDesign.CornerRadius.small)
+                    .cornerRadius(TalkNoteDesign.CornerRadius.medium)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: TalkNoteDesign.CornerRadius.medium)
+                            .stroke(selectedLanguage.isEmpty ? Color.red.opacity(0.5) : Color.clear, lineWidth: 1)
+                    )
+                }
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isExpanded.toggle()
+                        }
+                    }
                 }
             }
         }
@@ -263,13 +286,21 @@ struct LanguagePickerCard: View {
             "en": "🇺🇸 English",
             "hi": "🇮🇳 Hindi",
             "bn": "🇧🇩 Bengali",
-            "ta": "🇮🇳 Tamil",
+            "ta": "🇮🇳 Tamil", 
             "te": "🇮🇳 Telugu",
             "mr": "🇮🇳 Marathi",
             "gu": "🇮🇳 Gujarati",
-            "kn": "🇮🇳 Kannada"
+            "kn": "🇮🇳 Kannada",
+            "es": "🇪🇸 Spanish",
+            "fr": "🇫🇷 French", 
+            "de": "🇩🇪 German",
+            "zh-Hans": "🇨🇳 Chinese",
+            "ar": "🇸🇦 Arabic",
+            "ru": "🇷🇺 Russian",
+            "ja": "🇯🇵 Japanese",
+            "ko": "🇰🇷 Korean"
         ]
-        return languageNames[code] ?? code.uppercased()
+        return languageNames[code] ?? "🌍 \(code.uppercased())"
     }
 }
 
