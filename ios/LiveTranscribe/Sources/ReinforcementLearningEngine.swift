@@ -360,6 +360,13 @@ public class ReinforcementLearningEngine: ObservableObject {
             timestamp: Date()
         )
         
+        // Store the corrected action in experience buffer for learning
+        let currentState = createLearningState(
+            userContext: RLUserContext(), // Default context for corrections
+            audioFeatures: original.audioFeatures
+        )
+        storeExperience(state: currentState, action: correctedAction)
+        
         // Add to language-specific model training data
         let model = getLanguageModel(for: original.languageCode)
         model.addTrainingExample(
