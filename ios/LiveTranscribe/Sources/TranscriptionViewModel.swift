@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import Speech
 
 @MainActor
 final class TranscriptionViewModel: ObservableObject {
@@ -34,6 +35,13 @@ final class TranscriptionViewModel: ObservableObject {
     }
 
     func start() {
+        // Check permissions before starting
+        guard AVAudioSession.sharedInstance().recordPermission == .granted,
+              SFSpeechRecognizer.authorizationStatus() == .authorized else {
+            print("Required permissions not granted")
+            return
+        }
+        
         isTranscribing = true
         displayText = ""
         sessionStartTime = Date().timeIntervalSince1970

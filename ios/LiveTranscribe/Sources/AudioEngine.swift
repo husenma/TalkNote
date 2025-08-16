@@ -5,6 +5,12 @@ final class AudioEngine {
     private let bus = 0
 
     func startStreaming(onBuffer: @escaping (AVAudioPCMBuffer, AVAudioTime) -> Void) {
+        // First check if we have microphone permission
+        guard AVAudioSession.sharedInstance().recordPermission == .granted else {
+            print("Microphone permission not granted")
+            return
+        }
+        
         let input = engine.inputNode
         let format = input.inputFormat(forBus: bus)
 

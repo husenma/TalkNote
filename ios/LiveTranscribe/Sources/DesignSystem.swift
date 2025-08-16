@@ -147,15 +147,16 @@ struct CardView<Content: View>: View {
 struct MicrophoneButton: View {
     @Binding var isRecording: Bool
     let action: () -> Void
+    var isDisabled: Bool = false
     
     @State private var pulseAnimation = false
     @State private var rotationAnimation = false
     
     var body: some View {
-        Button(action: action) {
+        Button(action: isDisabled ? {} : action) {
             ZStack {
-                // Pulse effect when recording
-                if isRecording {
+                // Pulse effect when recording (not when disabled)
+                if isRecording && !isDisabled {
                     Circle()
                         .fill(TalkNoteDesign.Colors.accentRed.opacity(0.3))
                         .frame(width: 100, height: 100)
@@ -169,24 +170,27 @@ struct MicrophoneButton: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: isRecording ? 
-                                    [TalkNoteDesign.Colors.accentRed, TalkNoteDesign.Colors.accentRed.opacity(0.7)] :
-                                    [TalkNoteDesign.Colors.gradientStart, TalkNoteDesign.Colors.gradientEnd],
+                                colors: isDisabled ? 
+                                    [Color.gray.opacity(0.3), Color.gray.opacity(0.5)] :
+                                    isRecording ? 
+                                        [TalkNoteDesign.Colors.accentRed, TalkNoteDesign.Colors.accentRed.opacity(0.7)] :
+                                        [TalkNoteDesign.Colors.gradientStart, TalkNoteDesign.Colors.gradientEnd],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 80, height: 80)
                     
-                    Image(systemName: isRecording ? "stop.fill" : "mic.fill")
+                    Image(systemName: isDisabled ? "mic.slash.fill" : isRecording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 32, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(isDisabled ? Color.gray : .white)
                         .rotationEffect(Angle(degrees: rotationAnimation ? 360 : 0))
                 }
-                .shadow(color: TalkNoteDesign.Shadow.medium, radius: 8, x: 0, y: 4)
+                .shadow(color: isDisabled ? Color.clear : TalkNoteDesign.Shadow.medium, radius: 8, x: 0, y: 4)
             }
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isDisabled)
         .onAppear {
             if isRecording {
                 pulseAnimation = true

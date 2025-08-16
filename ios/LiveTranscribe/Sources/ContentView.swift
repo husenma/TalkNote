@@ -5,7 +5,7 @@ import AVFoundation
 struct ContentView: View {
     @StateObject private var vm = TranscriptionViewModel()
     @StateObject private var securityManager = SecurityManager()
-    @State private var permissionsGranted = false
+    @StateObject private var permissionManager = PermissionManager()
     @State private var showingLanguageSettings = false
     @State private var showingSecuritySettings = false
 
@@ -49,7 +49,18 @@ struct ContentView: View {
         }
         .navigationViewStyle(.stack)
         .onAppear {
-            requestPermissions()
+            Task {
+                await permissionManager.requestAllPermissions()
+            }
+        }
+        .alert("Permissions Required", isPresented: $permissionManager.showingPermissionAlert) {
+            Button("Open Settings") {
+                permissionManager.openAppSettings()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            let explanation = permissionManager.showPermissionExplanation()
+            Text(explanation.message)
         }
         .sheet(isPresented: $showingLanguageSettings) {
             LanguageSettingsView(vm: vm)
@@ -76,6 +87,28 @@ struct ContentView: View {
             Spacer()
             
             HStack(spacing: TalkNoteDesign.Spacing.sm) {
+                // Permission status indicator
+                Button(action: {
+                    if permissionManager.permissionsDenied {
+                        permissionManager.openAppSettings()
+                    } else if !permissionManager.allPermissionsGranted {
+                        Task {
+                            await permissionManager.requestAllPermissions()
+                        }
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: permissionManager.allPermissionsGranted ? "checkmark.circle.fill" : 
+                                         permissionManager.permissionsDenied ? "exclamationmark.triangle.fill" : "circle")
+                            .foregroundColor(permissionManager.allPermissionsGranted ? .green : 
+                                           permissionManager.permissionsDenied ? .orange : .gray)
+                        Text(permissionManager.shortPermissionStatus)
+                            .font(TalkNoteDesign.Typography.caption)
+                            .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                
                 // Security status
                 Button(action: { showingSecuritySettings = true }) {
                     SecurityStatusView(securityManager: securityManager)
@@ -115,11 +148,13 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
                             if vm.displayText.isEmpty {
                                 VStack(spacing: TalkNoteDesign.Spacing.md) {
-                                    Image(systemName: "mic.circle")
+                                    Image(systemName: !permissionManager.allPermissionsGranted ? "lock.circle" : "mic.circle")
                                         .font(.system(size: 48))
                                         .foregroundColor(TalkNoteDesign.Colors.textTertiary)
                                     
-                                    Text("Tap the microphone to start speaking")
+                                    Text(!permissionManager.allPermissionsGranted ? 
+                                         "Grant microphone and speech permissions to start" :
+                                         "Tap the microphone to start speaking")
                                         .font(TalkNoteDesign.Typography.body)
                                         .foregroundColor(TalkNoteDesign.Colors.textSecondary)
                                         .multilineTextAlignment(.center)
@@ -179,13 +214,26 @@ struct ContentView: View {
     
     private var microphoneButtonView: some View {
         VStack(spacing: TalkNoteDesign.Spacing.sm) {
-            MicrophoneButton(isRecording: $vm.isTranscribing) {
-                vm.toggle()
-            }
+            MicrophoneButton(isRecording: $vm.isTranscribing, action: {
+                if permissionManager.allPermissionsGranted {
+                    vm.toggle()
+                } else if permissionManager.permissionsDenied {
+                    permissionManager.openAppSettings()
+                } else {
+                    Task {
+                        await permissionManager.requestAllPermissions()
+                    }
+                }
+            }, isDisabled: !permissionManager.allPermissionsGranted)
             
-            Text(vm.isTranscribing ? "Tap to stop recording" : "Tap to start recording")
+            Text(permissionManager.permissionsDenied ? 
+                 "Tap to open Settings" :
+                 !permissionManager.allPermissionsGranted ? 
+                 "Tap to grant permissions" :
+                 vm.isTranscribing ? "Tap to stop recording" : "Tap to start recording")
                 .font(TalkNoteDesign.Typography.caption)
                 .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                .multilineTextAlignment(.center)
         }
     }
     
@@ -216,23 +264,6 @@ struct ContentView: View {
             let temp = vm.sourceLanguage
             vm.sourceLanguage = vm.targetLanguage
             vm.targetLanguage = temp
-        }
-    }
-    
-    private func requestPermissions() {
-        // Request microphone permission first
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            if granted {
-                // Then request speech recognition permission
-                SFSpeechRecognizer.requestAuthorization { status in
-                    DispatchQueue.main.async {
-                        self.permissionsGranted = (status == .authorized)
-                        if self.permissionsGranted {
-                            vm.requestPermissions()
-                        }
-                    }
-                }
-            }
         }
     }
 }

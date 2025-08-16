@@ -34,9 +34,9 @@
 		<string>armv7</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>TalkNote needs microphone access to capture your voice for real-time transcription and translation. Your audio is processed locally and only speech recognition data is sent to Azure services for translation.</string>
+	<string>TalkNote requires microphone access to capture your voice for real-time speech transcription and translation. Your audio is processed securely to provide accurate translation between multiple languages including Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, and English. Audio data is only used for translation purposes and is not stored permanently.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>TalkNote uses speech recognition to convert your spoken words into text for transcription and translation between multiple Indian languages and English. This enables real-time communication assistance.</string>
+	<string>TalkNote uses speech recognition to accurately convert your spoken words into text for real-time transcription and translation between Indian languages and English. This enables seamless communication across language barriers. Speech processing is performed both locally and through secure cloud services to ensure the highest accuracy.</string>
 	<key>NSNetworkVolumesUsageDescription</key>
 	<string>TalkNote connects to Azure translation services to provide accurate translations between Indian languages and English.</string>
 	<key>NSLocalNetworkUsageDescription</key>
