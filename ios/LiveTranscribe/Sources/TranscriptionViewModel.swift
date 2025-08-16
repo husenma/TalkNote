@@ -22,19 +22,27 @@ final class TranscriptionViewModel: ObservableObject {
     private var sessionStartTime: TimeInterval = 0
 
     func requestPermissions() {
+        print("🔐 DEBUG: Requesting permissions...")
         if #available(iOS 17.0, *) {
-            AVAudioApplication.requestRecordPermission { _ in }
+            AVAudioApplication.requestRecordPermission { granted in
+                print("🎤 DEBUG: iOS 17+ Audio permission granted: \(granted)")
+            }
         } else {
-            AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                print("🎤 DEBUG: iOS 16- Audio permission granted: \(granted)")
+            }
         }
         SpeechService.requestAuthorization()
+        print("🗣️ DEBUG: Speech authorization requested")
     }
 
     func toggle() {
+        print("🔄 DEBUG: Toggle called, current state: isTranscribing = \(isTranscribing)")
         if isTranscribing { stop() } else { start() }
     }
 
     func start() {
+        print("🚀 DEBUG: Start function called")
         // Check permissions before starting
         let micPermissionGranted: Bool
         if #available(iOS 17.0, *) {
@@ -49,24 +57,31 @@ final class TranscriptionViewModel: ObservableObject {
             }
         }
         
-        guard micPermissionGranted,
-              SFSpeechRecognizer.authorizationStatus() == .authorized else {
-            print("Required permissions not granted")
+        let speechPermissionGranted = SFSpeechRecognizer.authorizationStatus() == .authorized
+        print("🔐 DEBUG: Permissions - Mic: \(micPermissionGranted), Speech: \(speechPermissionGranted)")
+        
+        guard micPermissionGranted, speechPermissionGranted else {
+            print("❌ DEBUG: Required permissions not granted - stopping start process")
             return
         }
         
         isTranscribing = true
         displayText = ""
         sessionStartTime = Date().timeIntervalSince1970
+        print("🎤 DEBUG: Starting transcription...")
 
         // Prefer Azure Speech Translation with auto language detection when configured
         if azureSpeech.isAvailable {
+            print("🔥 DEBUG: Using Azure Speech service")
             azureSpeech.start(targetLanguage: targetLanguage,
                               autoDetectLanguages: ["en-US","es-ES","fr-FR","de-DE","hi-IN","bn-IN","ta-IN","te-IN","mr-IN","gu-IN","kn-IN","ar-SA","ru-RU","ja-JP","ko-KR","zh-CN"],
                               phrases: learning.currentPhrases) { [weak self] text, isFinal, detectedLang in
                 guard let self else { return }
                 Task { @MainActor in
+                    print("🎯 DEBUG: Azure speech result: '\(text)', isFinal: \(isFinal)")
                     if self.displayText.isEmpty { self.displayText = text } else { self.displayText += (text.isEmpty ? "" : " " + text) }
+                    print("📝 DEBUG: displayText updated to: '\(self.displayText)'")
+                }
                 }
             }
             // No need to stream audio manually; Azure SDK handles mic capture via SPXAudioConfiguration
@@ -74,11 +89,14 @@ final class TranscriptionViewModel: ObservableObject {
         }
 
         // Fallback: Apple Speech + Azure Translator with RL enhancement
+        print("🍎 DEBUG: Using Apple Speech service (Azure not available)")
         speech.start(onResult: { [weak self] text, isFinal, detectedLang in
             guard let self else { return }
+            print("🎯 DEBUG: Apple speech result: '\(text)', isFinal: \(isFinal), detected: \(detectedLang)")
             Task { @MainActor in
                 do {
                     let translated = try await self.translator.translate(text: text, from: detectedLang, to: self.targetLanguage)
+                    print("🌐 DEBUG: Translation result: '\(translated)'")
                     
                     // Enhance translation with reinforcement learning
                     let audioFeatures = RLAudioFeatures()
@@ -95,6 +113,7 @@ final class TranscriptionViewModel: ObservableObject {
                         audioFeatures: audioFeatures,
                         userContext: userContext
                     )
+                    print("🧠 DEBUG: RL optimized translation: '\(optimizedTranslation)'")
                     
                     if self.displayText.isEmpty {
                         self.displayText = optimizedTranslation
@@ -104,25 +123,30 @@ final class TranscriptionViewModel: ObservableObject {
                         // Show partial inline (optional). Keep UI simple: append preview with ellipsis
                         self.displayText += " " + translated
                     }
+                    print("📝 DEBUG: Final displayText: '\(self.displayText)'")
                 } catch {
                     // Ignore translation errors; keep raw text
+                    print("❌ DEBUG: Translation error: \(error), using raw text: '\(text)'")
                     if self.displayText.isEmpty { self.displayText = text } else { self.displayText += " " + text }
+                    print("📝 DEBUG: displayText (raw): '\(self.displayText)'")
                 }
             }
-    }, userPhrases: learning.currentPhrases)
+        }, userPhrases: learning.currentPhrases)
 
+        print("🎧 DEBUG: Starting audio streaming...")
         audio.startStreaming { [weak self] buffer, when in
+            print("🔊 DEBUG: Audio buffer received, size: \(buffer.frameLength)")
             self?.speech.append(buffer: buffer)
         }
     }
 
     func stop() {
+        print("⏹️ DEBUG: Stopping transcription...")
         isTranscribing = false
         audio.stop()
         Task { await speech.shutdown() }
-    }
-    
-    // MARK: - Reinforcement Learning Feedback
+        print("🔇 DEBUG: Transcription stopped, final text: '\(displayText)'")
+    }    // MARK: - Reinforcement Learning Feedback
     
     func provideFeedback(isPositive: Bool, correctedText: String? = nil) {
         guard !displayText.isEmpty else { return }

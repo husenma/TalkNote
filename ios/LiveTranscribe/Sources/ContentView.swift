@@ -51,6 +51,8 @@ struct ContentView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .navigationBarHidden(true)
+        .ignoresSafeArea(.all, edges: .all)
         .onAppear {
             // Check permissions when view appears
             startupPermissionManager.checkInitialPermissions()
@@ -190,6 +192,28 @@ struct ContentView: View {
                                     .foregroundColor(TalkNoteDesign.Colors.textPrimary)
                                     .textSelection(.enabled)
                                     .id("transcriptionText")
+                            }
+                            
+                            // Debug status section
+                            if vm.isTranscribing {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("🐛 DEBUG STATUS")
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                    Text("Recording: \(vm.isTranscribing ? "✅" : "❌")")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("Text Length: \(vm.displayText.count)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("Source: \(vm.sourceLanguage) → Target: \(vm.targetLanguage)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.top, 8)
+                                .padding(.horizontal, 8)
+                                .background(Color.orange.opacity(0.1))
+                                .cornerRadius(4)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
