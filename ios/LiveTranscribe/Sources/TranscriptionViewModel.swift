@@ -27,6 +27,7 @@ class TranscriptionViewModel: ObservableObject {
     private let translatorService = TranslatorService()
     private let audioEngine = AudioEngine()
     private var speechTask: SFSpeechRecognitionTask?
+    private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
     private let learningStore = UserLearningStore()
     
     // ML and Reinforcement Learning
@@ -59,10 +60,18 @@ class TranscriptionViewModel: ObservableObject {
     
     private func requestPermissions() async {
         // Request microphone permission
-        let micStatus = await AVAudioSession.sharedInstance().requestRecordPermission()
+        let micStatus = await withCheckedContinuation { continuation in
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
         
         // Request speech recognition permission
-        let speechStatus = await SFSpeechRecognizer.requestAuthorization()
+        let speechStatus = await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status)
+            }
+        }
         
         if micStatus && speechStatus == .authorized {
             await MainActor.run {
@@ -116,7 +125,7 @@ class TranscriptionViewModel: ObservableObject {
             audioEngine.startStreaming { [weak self] buffer, time in
                 guard let self = self else { return }
                 // Process audio buffer for speech recognition
-                self.speechTask?.request?.append(buffer)
+                self.speechRequest?.append(buffer)
             }
             
             await MainActor.run {
@@ -135,7 +144,10 @@ class TranscriptionViewModel: ObservableObject {
     
     func stop() async {
         audioEngine.stop() // Use correct method name
+        speechRequest?.endAudio()
         speechTask?.cancel()
+        speechTask = nil
+        speechRequest = nil
         
         await MainActor.run {
             self.isRecording = false
@@ -188,6 +200,7 @@ class TranscriptionViewModel: ObservableObject {
         
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
+        speechRequest = request
         
         do {
             speechTask = try await recognizer.recognitionTask(with: request) { result, error in
@@ -257,19 +270,19 @@ class TranscriptionViewModel: ObservableObject {
             self.debugStatus = "Translating text..."
         }
         
-            do {
-                let translated = try await translatorService.translate(text: text, to: "en")
-                await MainActor.run {
-                    self.translatedText = translated
-                    self.debugStatus = "Translation complete"
-                }
-            } catch {
-                await MainActor.run {
-                    self.translatedText = "Translation failed"
-                    self.debugStatus = "Translation error"
-                }
+        do {
+            let translated = try await translatorService.translate(text: text, from: detectedLanguageCode ?? "auto", to: "en")
+            await MainActor.run {
+                self.translatedText = translated
+                self.debugStatus = "Translation complete"
+            }
+        } catch {
+            await MainActor.run {
+                self.translatedText = "Translation failed"
+                self.debugStatus = "Translation error"
             }
         }
+    }
         
         private func storeForReinforcementLearning(
             originalText: String,
@@ -442,7 +455,7 @@ class TranscriptionViewModel: ObservableObject {
             audioEngine.startStreaming { [weak self] buffer, time in
                 guard let self = self else { return }
                 // Process audio buffer
-                self.speechTask?.request?.append(buffer)
+                self.speechRequest?.append(buffer)
             }
             
             await MainActor.run {
