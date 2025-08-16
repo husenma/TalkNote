@@ -7,6 +7,7 @@ class TranscriptionViewModel: ObservableObject {
     @Published var transcribedText = ""
     @Published var translatedText = ""
     @Published var detectedLanguage = "Unknown"
+    @Published var detectedLanguageCode = "auto"
     @Published var isRecording = false
     @Published var isTranscribing = false
     @Published var isAutoPaused = false
@@ -246,6 +247,7 @@ class TranscriptionViewModel: ObservableObject {
         
         await MainActor.run {
             self.detectedLanguage = enhancedPrediction.language
+            self.detectedLanguageCode = self.languageNameToCode(enhancedPrediction.language)
             self.predictionReasoning = enhancedPrediction.reasoning
         }
         
@@ -422,6 +424,7 @@ class TranscriptionViewModel: ObservableObject {
                 self.translatedText = "Hello, I am speaking Hindi"
                 self.displayText = "नमस्ते, मैं हिंदी बोल रहा हूँ"
                 self.detectedLanguage = "Hindi"
+                self.detectedLanguageCode = "hi"
                 self.statusMessage = "Test completed"
                 self.debugStatus = "Hindi test transcription displayed"
             }
@@ -479,6 +482,7 @@ class TranscriptionViewModel: ObservableObject {
             
             await MainActor.run {
                 self.detectedLanguage = correctLanguage
+                self.detectedLanguageCode = self.languageNameToCode(correctLanguage)
                 self.learningProgress = enhancedRL.learningProgress
                 self.statusMessage = "Thank you for the correction!"
                 
@@ -505,6 +509,39 @@ class TranscriptionViewModel: ObservableObject {
                 self.learningProgress = 0.0
                 self.statusMessage = "Learning data reset"
             }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    private func languageNameToCode(_ languageName: String) -> String {
+        switch languageName.lowercased() {
+        case "hindi": return "hi"
+        case "bengali": return "bn"
+        case "telugu": return "te"
+        case "tamil": return "ta"
+        case "marathi": return "mr"
+        case "gujarati": return "gu"
+        case "kannada": return "kn"
+        case "malayalam": return "ml"
+        case "odia", "oriya": return "or"
+        case "punjabi": return "pa"
+        case "assamese": return "as"
+        case "urdu": return "ur"
+        case "nepali": return "ne"
+        case "sindhi": return "sd"
+        case "sanskrit": return "sa"
+        case "english": return "en"
+        case "spanish": return "es"
+        case "french": return "fr"
+        case "german": return "de"
+        case "italian": return "it"
+        case "portuguese": return "pt"
+        case "russian": return "ru"
+        case "japanese": return "ja"
+        case "korean": return "ko"
+        case "chinese": return "zh"
+        case "arabic": return "ar"
+        default: return "auto"
         }
     }
 }
