@@ -4,8 +4,12 @@ import Speech
 
 @MainActor
 class TranscriptionViewModel: ObservableObject {
-    @Published var transcribedText = ""
-    @Published var translatedText = ""
+    @Published var transcribedText =        await MainActor.run {
+            self.isRecording = false
+            self.isTranscribing = false
+            self.statusMessage = "Stopped"
+            self.debugStatus = "Ready"
+        }   @Published var translatedText = ""
     @Published var detectedLanguage = "Unknown"
     @Published var detectedLanguageCode = "auto"
     @Published var isRecording = false
@@ -115,8 +119,8 @@ class TranscriptionViewModel: ObservableObject {
     
     func start() async {
         await MainActor.run {
-            self.statusMessage = "Starting transcription..."
-            self.debugStatus = "Initializing audio engine..."
+            self.statusMessage = "Starting..."
+            self.debugStatus = "Ready to listen"
             self.isRecording = true
             self.isTranscribing = true
         }
@@ -131,7 +135,7 @@ class TranscriptionViewModel: ObservableObject {
             
             await MainActor.run {
                 self.statusMessage = "Recording..."
-                self.debugStatus = "Audio engine started successfully"
+                self.debugStatus = "Microphone active"
             }
             
             // Try Azure Speech Service first
@@ -168,12 +172,16 @@ class TranscriptionViewModel: ObservableObject {
             speechService.start(onResult: { [weak self] text, isFinal, detectedLanguage in
                 Task { @MainActor in
                     guard let self = self else { return }
+                    // Update UI immediately for real-time display
                     self.transcribedText = text
                     self.displayText = text
-                    self.debugStatus = "Azure: \(text.prefix(30))..."
+                    self.debugStatus = "Listening with Azure..."
                     
+                    // Only do heavy processing on final results
                     if isFinal {
-                        await self.processTranscriptionResult(text)
+                        Task {
+                            await self.processTranscriptionResult(text)
+                        }
                     }
                 }
             })
@@ -188,7 +196,7 @@ class TranscriptionViewModel: ObservableObject {
     
     private func startAppleSpeechRecognition() async {
         await MainActor.run {
-            self.debugStatus = "Using Apple Speech Recognition..."
+            self.debugStatus = "Starting Apple Speech..."
         }
         
         guard let recognizer = SFSpeechRecognizer() else {
@@ -203,16 +211,27 @@ class TranscriptionViewModel: ObservableObject {
         request.shouldReportPartialResults = true
         speechRequest = request
         
+        // Start audio engine to feed the speech request
+        audioEngine.startStreaming { [weak self] buffer, time in
+            guard let self = self else { return }
+            // Feed audio directly to speech recognition
+            self.speechRequest?.append(buffer)
+        }
+        
         do {
             speechTask = try await recognizer.recognitionTask(with: request) { result, error in
                 if let result = result {
                     Task { @MainActor in
+                        // Update UI immediately for real-time display
                         self.transcribedText = result.bestTranscription.formattedString
                         self.displayText = result.bestTranscription.formattedString
-                        self.debugStatus = "Transcribing: \(result.bestTranscription.formattedString.prefix(30))..."
+                        self.debugStatus = "Transcribing..."
                         
+                        // Only do heavy processing on final results
                         if result.isFinal {
-                            await self.translateText(result.bestTranscription.formattedString)
+                            Task {
+                                await self.processTranscriptionResult(result.bestTranscription.formattedString)
+                            }
                         }
                     }
                 }
@@ -233,10 +252,9 @@ class TranscriptionViewModel: ObservableObject {
     }
     
     private func processTranscriptionResult(_ result: String) async {
+        // Don't update displayText here to avoid overriding real-time updates
         await MainActor.run {
-            self.transcribedText = result
-            self.displayText = result
-            self.debugStatus = "Processing: \(result.prefix(30))..."
+            self.debugStatus = "Processing with AI..."
         }
         
         // Enhanced ML language detection
@@ -249,6 +267,7 @@ class TranscriptionViewModel: ObservableObject {
             self.detectedLanguage = enhancedPrediction.language
             self.detectedLanguageCode = self.languageNameToCode(enhancedPrediction.language)
             self.predictionReasoning = enhancedPrediction.reasoning
+            self.debugStatus = "AI Complete - \(enhancedPrediction.language)"
         }
         
         // Translate if not English
@@ -425,8 +444,8 @@ class TranscriptionViewModel: ObservableObject {
                 self.displayText = "नमस्ते, मैं हिंदी बोल रहा हूँ"
                 self.detectedLanguage = "Hindi"
                 self.detectedLanguageCode = "hi"
-                self.statusMessage = "Test completed"
-                self.debugStatus = "Hindi test transcription displayed"
+                self.statusMessage = "Test mode"
+                self.debugStatus = "Demo: Hindi → English"
             }
         }
     }
