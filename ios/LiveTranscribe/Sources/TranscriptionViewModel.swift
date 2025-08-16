@@ -4,12 +4,8 @@ import Speech
 
 @MainActor
 class TranscriptionViewModel: ObservableObject {
-    @Published var transcribedText =        await MainActor.run {
-            self.isRecording = false
-            self.isTranscribing = false
-            self.statusMessage = "Stopped"
-            self.debugStatus = "Ready"
-        }   @Published var translatedText = ""
+    @Published var transcribedText = ""
+    @Published var translatedText = ""
     @Published var detectedLanguage = "Unknown"
     @Published var detectedLanguageCode = "auto"
     @Published var isRecording = false
@@ -158,7 +154,7 @@ class TranscriptionViewModel: ObservableObject {
             self.isRecording = false
             self.isTranscribing = false
             self.statusMessage = "Stopped"
-            self.debugStatus = "Transcription stopped"
+            self.debugStatus = "Ready"
         }
     }
     
