@@ -5,11 +5,11 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>LiveTranscribe</string>
+	<string>TalkNote</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.example.LiveTranscribe</string>
+	<string>com.example.TalkNote</string>
 	<key>CFBundleName</key>
-	<string>LiveTranscribe</string>
+	<string>TalkNote</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -25,11 +25,26 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>microphone</string>
+		<string>armv7</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Microphone access is required for live transcription.</string>
+	<string>TalkNote needs microphone access to capture your voice for real-time transcription and translation. Your audio is processed locally and only speech recognition data is sent to Azure services for translation.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Speech recognition is required to transcribe audio.</string>
+	<string>TalkNote uses speech recognition to convert your spoken words into text for transcription and translation between multiple Indian languages and English. This enables real-time communication assistance.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>TalkNote connects to Azure translation services to provide accurate translations between Indian languages and English.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>TalkNote may access local network resources for improved translation services and caching.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>TalkNote uses anonymized usage data to improve translation accuracy and user experience through machine learning.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
