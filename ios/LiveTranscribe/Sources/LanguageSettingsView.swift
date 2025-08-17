@@ -11,8 +11,37 @@ struct LanguageSettingsView: View {
                 LazyVStack(spacing: TalkNoteDesign.Spacing.lg) {
                     // Header
                     headerView
-                       }
-        return flags[code] ?? "🌐"
+                    // Quick Language Pairs
+                    quickLanguagePairsView
+                    
+                    // Detailed Language Settings
+                    detailedLanguageSettingsView
+                    
+                    // Advanced ML Settings
+                    advancedSettingsView
+                    
+                    // Model Selection Settings
+                    modelSelectionView
+                    
+                    // Audio Enhancement Settings
+                    audioSettingsView
+                    
+                    // Statistics
+                    statisticsView
+                }
+                .padding(TalkNoteDesign.Spacing.md)
+            }
+            .navigationTitle("Language Settings")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                }
+            }
+        }
     }
     
     // MARK: - Model Selection Cards
@@ -104,38 +133,6 @@ struct LanguageSettingsView: View {
             .cornerRadius(TalkNoteDesign.CornerRadius.small)
         }
         .buttonStyle(PlainButtonStyle())
-    }  
-                    // Quick Language Pairs
-                    quickLanguagePairsView
-                    
-                    // Detailed Language Settings
-                    detailedLanguageSettingsView
-                    
-                    // Advanced ML Settings
-                    advancedSettingsView
-                    
-                    // Model Selection Settings
-                    modelSelectionView
-                    
-                    // Audio Enhancement Settings
-                    audioSettingsView
-                    
-                    // Statistics
-                    statisticsView
-                }
-                .padding(TalkNoteDesign.Spacing.md)
-            }
-            .navigationTitle("Language Settings")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                }
-            }
-        }
     }
     
     // MARK: - Header
