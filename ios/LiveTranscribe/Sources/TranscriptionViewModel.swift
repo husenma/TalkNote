@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 import AVFoundation
 import Speech
 
@@ -108,6 +109,7 @@ class TranscriptionViewModel: ObservableObject {
         }
     }
     
+    @MainActor
     func toggle() {
         Task {
             if isTranscribing {
@@ -118,6 +120,7 @@ class TranscriptionViewModel: ObservableObject {
         }
     }
     
+    @MainActor
     func start() async {
         await MainActor.run {
             self.statusMessage = "Starting"
@@ -131,6 +134,7 @@ class TranscriptionViewModel: ObservableObject {
         await startAppleSpeechRecognition()
     }
     
+    @MainActor
     func stop() async {
         audioEngine.stop() // Use correct method name
         speechRequest?.endAudio()
@@ -486,6 +490,7 @@ class TranscriptionViewModel: ObservableObject {
         return "en"
     }
     
+    @MainActor
     func testTranscription() {
         Task {
             await MainActor.run {
@@ -524,6 +529,7 @@ class TranscriptionViewModel: ObservableObject {
         }
     }
     
+    @MainActor
     func clearText() {
         Task {
             await MainActor.run {
@@ -536,6 +542,7 @@ class TranscriptionViewModel: ObservableObject {
         }
     }
     
+    @MainActor
     func forceStart() {
         Task {
             await MainActor.run {
@@ -638,6 +645,7 @@ class TranscriptionViewModel: ObservableObject {
         }
     }
     
+    @MainActor
     func checkPermissionsStatus() {
         Task {
             // Check microphone permission
