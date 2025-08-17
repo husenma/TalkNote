@@ -457,8 +457,8 @@ class TranscriptionViewModel: ObservableObject {
         // Translate the text if needed
         if targetLanguage != "English" && !text.isEmpty {
             do {
-                let translated = try await translatorService.translateText(
-                    text, 
+                let translated = try await translatorService.translate(
+                    text: text, 
                     from: detectedLanguageCode, 
                     to: languageNameToCode(targetLanguage)
                 )
