@@ -90,11 +90,11 @@ final class AudioEngine {
     }
     
     private func setupNoiseReduction(input: AVAudioInputNode, format: AVAudioFormat) {
-        // Create noise reduction unit
+        // Create noise reduction unit using available iOS audio unit
         guard let noiseSuppression = AVAudioUnitEffect(audioComponentDescription: 
             AudioComponentDescription(
                 componentType: kAudioUnitType_Effect,
-                componentSubType: kAudioUnitSubType_SpeechEnhancement,
+                componentSubType: kAudioUnitSubType_NBandEQ, // Use equalizer for noise filtering
                 componentManufacturer: kAudioUnitManufacturer_Apple,
                 componentFlags: 0,
                 componentFlagsMask: 0
@@ -166,25 +166,6 @@ final class AudioEngine {
     
     func stopRecording() async {
         stop()
-    }
-    
-    // WhisperKit-compatible streaming method
-    func startStreamingForWhisperKit() throws -> AsyncStream<Data> {
-        return AsyncStream { continuation in
-            startStreamingWithEnhancedSettings(
-                sensitivity: 80.0,
-                noiseReduction: true
-            ) { buffer, time in
-                // Convert AVAudioPCMBuffer to Data for WhisperKit compatibility
-                guard let channelData = buffer.int16ChannelData?[0] else { return }
-                let data = Data(bytes: channelData, count: Int(buffer.frameLength) * 2)
-                continuation.yield(data)
-            }
-            
-            continuation.onTermination = { _ in
-                self.stop()
-            }
-        }
     }
     
     // MARK: - WhisperKit Support
