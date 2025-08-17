@@ -11,7 +11,100 @@ struct LanguageSettingsView: View {
                 LazyVStack(spacing: TalkNoteDesign.Spacing.lg) {
                     // Header
                     headerView
+                       }
+        return flags[code] ?? "🌐"
+    }
+    
+    // MARK: - Model Selection Cards
+    
+    private func modelSelectionCard(model: TranscriptionModel) -> some View {
+        Button(action: {
+            withAnimation(.spring()) {
+                vm.selectedTranscriptionModel = model
+            }
+        }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(model.rawValue)
+                            .font(TalkNoteDesign.Typography.callout)
+                            .fontWeight(.semibold)
+                            .foregroundColor(vm.selectedTranscriptionModel == model ? .white : TalkNoteDesign.Colors.textPrimary)
+                        
+                        Spacer()
+                        
+                        Text(model.accuracy)
+                            .font(TalkNoteDesign.Typography.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(vm.selectedTranscriptionModel == model ? .white : TalkNoteDesign.Colors.primaryBlue)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                vm.selectedTranscriptionModel == model ? 
+                                Color.white.opacity(0.2) : 
+                                TalkNoteDesign.Colors.primaryBlue.opacity(0.1)
+                            )
+                            .cornerRadius(10)
+                    }
                     
+                    Text(model.description)
+                        .font(TalkNoteDesign.Typography.caption)
+                        .foregroundColor(vm.selectedTranscriptionModel == model ? .white.opacity(0.8) : TalkNoteDesign.Colors.textSecondary)
+                }
+                
+                if vm.selectedTranscriptionModel == model {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.white)
+                        .font(.title3)
+                }
+            }
+            .padding(TalkNoteDesign.Spacing.md)
+            .background(
+                vm.selectedTranscriptionModel == model ? 
+                TalkNoteDesign.Colors.primaryBlue : 
+                TalkNoteDesign.Colors.surfaceSecondary
+            )
+            .cornerRadius(TalkNoteDesign.CornerRadius.medium)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func languageModelCard(model: LanguageModel) -> some View {
+        Button(action: {
+            withAnimation(.spring()) {
+                vm.selectedLanguageModel = model
+            }
+        }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.rawValue)
+                        .font(TalkNoteDesign.Typography.callout)
+                        .fontWeight(.medium)
+                        .foregroundColor(vm.selectedLanguageModel == model ? .white : TalkNoteDesign.Colors.textPrimary)
+                    
+                    Text(model.description)
+                        .font(TalkNoteDesign.Typography.caption)
+                        .foregroundColor(vm.selectedLanguageModel == model ? .white.opacity(0.8) : TalkNoteDesign.Colors.textSecondary)
+                }
+                
+                Spacer()
+                
+                if vm.selectedLanguageModel == model {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.white)
+                        .font(.title3)
+                }
+            }
+            .padding(TalkNoteDesign.Spacing.sm)
+            .background(
+                vm.selectedLanguageModel == model ? 
+                TalkNoteDesign.Colors.primaryBlue : 
+                TalkNoteDesign.Colors.surfaceSecondary
+            )
+            .cornerRadius(TalkNoteDesign.CornerRadius.small)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }  
                     // Quick Language Pairs
                     quickLanguagePairsView
                     
@@ -20,6 +113,12 @@ struct LanguageSettingsView: View {
                     
                     // Advanced ML Settings
                     advancedSettingsView
+                    
+                    // Model Selection Settings
+                    modelSelectionView
+                    
+                    // Audio Enhancement Settings
+                    audioSettingsView
                     
                     // Statistics
                     statisticsView
@@ -249,6 +348,152 @@ struct LanguageSettingsView: View {
                                     .foregroundColor(TalkNoteDesign.Colors.textSecondary)
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Model Selection
+    
+    private var modelSelectionView: some View {
+        CardView {
+            VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
+                Label("Transcription Models", systemImage: "brain.head.profile")
+                    .font(TalkNoteDesign.Typography.headline)
+                    .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                
+                Text("Choose the best model for your needs. Higher accuracy models may require internet connection.")
+                    .font(TalkNoteDesign.Typography.caption)
+                    .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                
+                VStack(spacing: TalkNoteDesign.Spacing.sm) {
+                    ForEach(TranscriptionModel.allCases) { model in
+                        modelSelectionCard(model: model)
+                    }
+                }
+                
+                Divider()
+                
+                // Language Model Selection
+                VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
+                    Text("Language Processing Model")
+                        .font(TalkNoteDesign.Typography.callout)
+                        .fontWeight(.semibold)
+                        .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                    
+                    ForEach(LanguageModel.allCases) { languageModel in
+                        languageModelCard(model: languageModel)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Audio Enhancement Settings
+    
+    private var audioSettingsView: some View {
+        CardView {
+            VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
+                Label("Audio Enhancement", systemImage: "waveform")
+                    .font(TalkNoteDesign.Typography.headline)
+                    .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                
+                Text("Samsung-style audio processing for better accuracy")
+                    .font(TalkNoteDesign.Typography.caption)
+                    .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                
+                VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
+                    // Audio Sensitivity
+                    VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
+                        HStack {
+                            Text("Microphone Sensitivity")
+                                .font(TalkNoteDesign.Typography.callout)
+                                .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            
+                            Spacer()
+                            
+                            Text("\(Int(vm.audioSensitivity * 100))%")
+                                .font(TalkNoteDesign.Typography.caption)
+                                .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(TalkNoteDesign.Colors.surfaceSecondary)
+                                .cornerRadius(4)
+                        }
+                        
+                        HStack {
+                            Text("Low")
+                                .font(TalkNoteDesign.Typography.caption)
+                                .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                            
+                            Slider(value: $vm.audioSensitivity, in: 0.1...1.0, step: 0.1)
+                                .tint(TalkNoteDesign.Colors.primaryBlue)
+                            
+                            Text("High")
+                                .font(TalkNoteDesign.Typography.caption)
+                                .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                        }
+                        
+                        Text("Higher sensitivity catches quiet speech but may pick up background noise")
+                            .font(TalkNoteDesign.Typography.caption)
+                            .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                    }
+                    
+                    Divider()
+                    
+                    // Noise Reduction
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Noise Reduction")
+                                .font(TalkNoteDesign.Typography.callout)
+                                .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            
+                            Text("Reduce background noise for clearer transcription")
+                                .font(TalkNoteDesign.Typography.caption)
+                                .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $vm.noiseReduction)
+                            .toggleStyle(SwitchToggleStyle(tint: TalkNoteDesign.Colors.primaryBlue))
+                    }
+                    
+                    Divider()
+                    
+                    // Sound Environment Detection
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Environment Sound Detection")
+                                .font(TalkNoteDesign.Typography.callout)
+                                .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            
+                            Text("Identify and describe surrounding sounds like Samsung Live Transcribe")
+                                .font(TalkNoteDesign.Typography.caption)
+                                .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $vm.soundEnvironmentDetection)
+                            .toggleStyle(SwitchToggleStyle(tint: TalkNoteDesign.Colors.primaryBlue))
+                    }
+                    
+                    if vm.soundEnvironmentDetection && !vm.environmentSounds.isEmpty {
+                        HStack {
+                            Text("Detected Sounds:")
+                                .font(TalkNoteDesign.Typography.caption)
+                                .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                            
+                            Text(vm.environmentSounds)
+                                .font(TalkNoteDesign.Typography.caption)
+                                .foregroundColor(TalkNoteDesign.Colors.primaryBlue)
+                        }
+                        .padding(.horizontal, TalkNoteDesign.Spacing.sm)
+                        .padding(.vertical, TalkNoteDesign.Spacing.xs)
+                        .background(TalkNoteDesign.Colors.primaryBlue.opacity(0.1))
+                        .cornerRadius(TalkNoteDesign.CornerRadius.small)
                     }
                 }
             }

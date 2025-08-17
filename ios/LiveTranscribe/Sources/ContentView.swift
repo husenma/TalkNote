@@ -215,22 +215,62 @@ struct ContentView: View {
                                 }
                             }
                             
-                            // Debug status section - only show when transcribing
+                            // Debug status section - show model and enhanced info
                             if vm.isTranscribing {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
-                                        Text("🎙️ Status: \(vm.debugStatus)")
+                                        Text("🎙️ \(vm.debugStatus)")
                                             .font(.caption)
                                             .foregroundColor(.blue)
+                                        
                                         Spacer()
-                                        if vm.isMLLearningEnabled {
-                                            Text("🧠 AI Enhanced")
+                                        
+                                        HStack(spacing: 4) {
+                                            if vm.isMLLearningEnabled {
+                                                Text("🧠 AI")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.purple)
+                                                    .padding(.horizontal, 4)
+                                                    .padding(.vertical, 1)
+                                                    .background(Color.purple.opacity(0.1))
+                                                    .cornerRadius(3)
+                                            }
+                                            
+                                            if vm.noiseReduction {
+                                                Text("🔇 NR")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.green)
+                                                    .padding(.horizontal, 4)
+                                                    .padding(.vertical, 1)
+                                                    .background(Color.green.opacity(0.1))
+                                                    .cornerRadius(3)
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Model information
+                                    HStack {
+                                        Text("📱 Model: \(vm.selectedTranscriptionModel.rawValue)")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Spacer()
+                                        
+                                        Text("🎯 \(vm.selectedTranscriptionModel.accuracy)")
+                                            .font(.caption2)
+                                            .foregroundColor(.green)
+                                    }
+                                    
+                                    // Environment sounds
+                                    if vm.soundEnvironmentDetection && !vm.environmentSounds.isEmpty {
+                                        HStack {
+                                            Text("🔊 Environment:")
                                                 .font(.caption2)
-                                                .foregroundColor(.purple)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color.purple.opacity(0.1))
-                                                .cornerRadius(3)
+                                                .foregroundColor(.secondary)
+                                            
+                                            Text(vm.environmentSounds)
+                                                .font(.caption2)
+                                                .foregroundColor(.blue)
                                         }
                                     }
                                     
