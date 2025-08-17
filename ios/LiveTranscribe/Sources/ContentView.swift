@@ -53,8 +53,8 @@ struct ContentView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
                     
-                    Button("Force Start") {
-                        vm.forceStart()
+                    Button("Permissions") {
+                        vm.checkPermissionsStatus()
                     }
                     .buttonStyle(SecondaryButtonStyle())
                     
@@ -338,7 +338,13 @@ struct ContentView: View {
         VStack(spacing: TalkNoteDesign.Spacing.sm) {
             MicrophoneButton(isRecording: $vm.isTranscribing, action: {
                 if startupPermissionManager.allPermissionsGranted && permissionManager.allPermissionsGranted {
-                    vm.toggle()
+                    Task {
+                        if vm.isTranscribing {
+                            await vm.stop()
+                        } else {
+                            await vm.start()
+                        }
+                    }
                 } else {
                     startupPermissionManager.showingPermissionScreen = true
                 }

@@ -120,32 +120,15 @@ class TranscriptionViewModel: ObservableObject {
     
     func start() async {
         await MainActor.run {
-            self.statusMessage = "Ready"
+            self.statusMessage = "Starting"
             self.debugStatus = "🎙️ Starting..."
             self.isRecording = true
             self.isTranscribing = true
+            self.displayText = "" // Clear previous text
         }
         
-        do {
-            // Use the correct method name from AudioEngine
-            audioEngine.startStreaming { [weak self] buffer, time in
-                guard let self = self else { return }
-                // Process audio buffer for speech recognition
-                self.speechRequest?.append(buffer)
-            }
-            
-            await MainActor.run {
-                self.statusMessage = "Listening"
-                self.debugStatus = "🎙️ Ready"
-            }
-            
-            // Try Azure Speech Service first
-            await startAzureSpeechService()
-            
-        } catch {
-            // Fall back to Apple Speech Recognition
-            await startAppleSpeechRecognition()
-        }
+        // Start with Apple Speech Recognition directly (more reliable)
+        await startAppleSpeechRecognition()
     }
     
     func stop() async {
@@ -168,25 +151,41 @@ class TranscriptionViewModel: ObservableObject {
             self.debugStatus = "🚀 Connecting..."
         }
         
-        do {
-            // Use the correct method from SpeechService
-            speechService.start(onResult: { [weak self] text, isFinal, detectedLanguage in
-                Task { @MainActor in
-                    guard let self = self else { return }
-                    // IMMEDIATE real-time display - no processing delays
-                    self.transcribedText = text
-                    self.displayText = text
-                    self.debugStatus = "🎙️ Azure Live"
-                    
-                    // Only do ML processing on final results in background
-                    if isFinal {
-                        // Don't await - let it run in background
-                        Task.detached {
-                            await self.processTranscriptionResult(text)
-                        }
+        // Start the speech service
+        speechService.start(onResult: { [weak self] text, isFinal, detectedLanguage in
+            Task { @MainActor in
+                guard let self = self else { return }
+                // IMMEDIATE real-time display - no processing delays
+                self.transcribedText = text
+                self.displayText = text
+                self.debugStatus = "🎙️ Azure Live"
+                
+                // Only do ML processing on final results in background
+                if isFinal {
+                    // Don't await - let it run in background
+                    Task.detached {
+                        await self.processTranscriptionResult(text)
                     }
                 }
-            })
+            }
+        })
+        
+        // Create speech request for Apple Speech as fallback
+        speechRequest = SFSpeechAudioBufferRecognitionRequest()
+        speechRequest?.shouldReportPartialResults = true
+        
+        // Connect audio engine to speech service
+        do {
+            audioEngine.startStreaming { [weak self] buffer, time in
+                guard let self = self else { return }
+                // Feed audio to both services
+                self.speechService.append(buffer: buffer)
+                self.speechRequest?.append(buffer)
+            }
+            
+            await MainActor.run {
+                self.debugStatus = "🎙️ Azure Live"
+            }
             
         } catch {
             await MainActor.run {
@@ -205,33 +204,68 @@ class TranscriptionViewModel: ObservableObject {
             await MainActor.run {
                 self.statusMessage = "Speech recognition not available"
                 self.debugStatus = "SFSpeechRecognizer unavailable"
+                self.isTranscribing = false
             }
             return
         }
         
+        guard recognizer.isAvailable else {
+            await MainActor.run {
+                self.statusMessage = "Speech recognition not available"
+                self.debugStatus = "Speech recognition unavailable"
+                self.isTranscribing = false
+            }
+            return
+        }
+        
+        // Create new request
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         speechRequest = request
         
-        // Start audio engine to feed the speech request
+        // Start the recognition task
+        speechTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            Task { @MainActor in
+                if let error = error {
+                    self.debugStatus = "Error occurred"
+                    print("Speech recognition error: \(error)")
+                    return
+                }
+                
+                guard let result = result else { return }
+                
+                // IMMEDIATE real-time display - no processing delays
+                let currentText = result.bestTranscription.formattedString
+                self.transcribedText = currentText
+                self.displayText = currentText
+                self.debugStatus = "🎙️ Live"
+                
+                // Only do ML processing on final results in background
+                if result.isFinal {
+                    // Don't await - let it run in background
+                    Task.detached {
+                        await self.processTranscriptionResult(currentText)
+                    }
+                }
+            }
+        }
+        
+        // Now start the audio engine after the speech task is set up
         audioEngine.startStreaming { [weak self] buffer, time in
             guard let self = self else { return }
             // Feed audio directly to speech recognition
             self.speechRequest?.append(buffer)
         }
         
-        do {
-            speechTask = try await recognizer.recognitionTask(with: request) { result, error in
-                if let result = result {
-                    Task { @MainActor in
-                        // IMMEDIATE real-time display - no processing delays
-                        let currentText = result.bestTranscription.formattedString
-                        self.transcribedText = currentText
-                        self.displayText = currentText
-                        self.debugStatus = "🎙️ Live"
-                        
-                        // Only do ML processing on final results in background
-                        if result.isFinal {
+        // Give a moment for audio engine to start, then update status
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if self.isTranscribing {
+                self.debugStatus = "🎙️ Live"
+            }
+        }
+    }
                             // Don't await - let it run in background
                             Task.detached {
                                 await self.processTranscriptionResult(currentText)
@@ -455,13 +489,37 @@ class TranscriptionViewModel: ObservableObject {
     func testTranscription() {
         Task {
             await MainActor.run {
-                self.transcribedText = "नमस्ते, मैं हिंदी बोल रहा हूँ"
+                self.isTranscribing = true
+                self.isRecording = true
+                self.debugStatus = "🎙️ Live (Test Mode)"
+            }
+            
+            // Simulate progressive transcription
+            let testText = "नमस्ते, मैं हिंदी बोल रहा हूँ"
+            let words = testText.components(separatedBy: " ")
+            var currentText = ""
+            
+            for word in words {
+                if !currentText.isEmpty {
+                    currentText += " "
+                }
+                currentText += word
+                
+                await MainActor.run {
+                    self.transcribedText = currentText
+                    self.displayText = currentText
+                    self.detectedLanguage = "Hindi"
+                    self.detectedLanguageCode = "hi"
+                }
+                
+                // Simulate typing delay
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            }
+            
+            // Final result with translation
+            await MainActor.run {
                 self.translatedText = "Hello, I am speaking Hindi"
-                self.displayText = "नमस्ते, मैं हिंदी बोल रहा हूँ"
-                self.detectedLanguage = "Hindi"
-                self.detectedLanguageCode = "hi"
-                self.statusMessage = "Test mode"
-                self.debugStatus = "Demo: Hindi → English"
+                self.statusMessage = "Test completed"
             }
         }
     }
@@ -577,6 +635,24 @@ class TranscriptionViewModel: ObservableObject {
         case "chinese": return "zh"
         case "arabic": return "ar"
         default: return "auto"
+        }
+    }
+    
+    func checkPermissionsStatus() {
+        Task {
+            // Check microphone permission
+            let micPermission = AVAudioSession.sharedInstance().recordPermission
+            
+            // Check speech recognition permission
+            let speechPermission = SFSpeechRecognizer.authorizationStatus()
+            
+            await MainActor.run {
+                let micStatus = micPermission == .granted ? "✅ Granted" : "❌ Denied"
+                let speechStatus = speechPermission == .authorized ? "✅ Authorized" : "❌ Not Authorized"
+                
+                self.debugStatus = "Mic: \(micStatus) | Speech: \(speechStatus)"
+                self.displayText = "Permission Status:\n• Microphone: \(micStatus)\n• Speech Recognition: \(speechStatus)"
+            }
         }
     }
 }
