@@ -46,6 +46,13 @@ struct ContentView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
                     
+                    Button(vm.isMLLearningEnabled ? "AI On" : "AI Off") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            vm.isMLLearningEnabled.toggle()
+                        }
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    
                     Button("Force Start") {
                         vm.forceStart()
                     }
@@ -239,26 +246,48 @@ struct ContentView: View {
                                 }
                             }
                             
-                            // Debug status section
+                            // Debug status section - only show when transcribing
                             if vm.isTranscribing {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("🐛 DEBUG STATUS")
-                                        .font(.caption)
-                                        .foregroundColor(.orange)
-                                    Text("Recording: \(vm.isTranscribing ? "✅" : "❌")")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text("Text Length: \(vm.displayText.count)")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text("Source: \(vm.sourceLanguage) → Target: \(vm.targetLanguage)")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
+                                    HStack {
+                                        Text("🎙️ Status: \(vm.debugStatus)")
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                        Spacer()
+                                        if vm.isMLLearningEnabled {
+                                            Text("🧠 AI Enhanced")
+                                                .font(.caption2)
+                                                .foregroundColor(.purple)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.purple.opacity(0.1))
+                                                .cornerRadius(3)
+                                        }
+                                    }
+                                    
+                                    if !vm.predictionReasoning.isEmpty {
+                                        Text("🔍 \(vm.predictionReasoning)")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                    
+                                    HStack {
+                                        Text("🗣️ From: \(vm.detectedLanguage != "Unknown" ? vm.detectedLanguage : vm.sourceLanguage)")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        
+                                        if vm.detectedLanguage != "Unknown" && vm.detectedLanguage != "English" {
+                                            Text("→ 🇺🇸 \(vm.targetLanguage)")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
                                 }
                                 .padding(.top, 8)
                                 .padding(.horizontal, 8)
-                                .background(Color.orange.opacity(0.1))
-                                .cornerRadius(4)
+                                .background(Color.blue.opacity(0.05))
+                                .cornerRadius(6)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

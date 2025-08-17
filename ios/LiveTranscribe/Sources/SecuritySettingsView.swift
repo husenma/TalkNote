@@ -424,12 +424,17 @@ struct SecuritySettingsView: View {
     }
     
     private func toggleBiometricAuth() {
-        Task {
+        Task { @MainActor in
             if securityManager.biometricAuthEnabled {
                 securityManager.biometricAuthEnabled = false
             } else {
-                let success = await securityManager.enableBiometricAuth()
-                if !success {
+                do {
+                    let success = await securityManager.enableBiometricAuth()
+                    if !success {
+                        showingBiometricSetup = true
+                    }
+                } catch {
+                    print("Failed to toggle biometric authentication: \(error)")
                     showingBiometricSetup = true
                 }
             }

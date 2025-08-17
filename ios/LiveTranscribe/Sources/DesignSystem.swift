@@ -284,6 +284,33 @@ struct LanguagePickerCard: View {
     
     private func getLanguageDisplayName(_ code: String) -> String {
         let languageNames: [String: String] = [
+            "Auto-detect": "🌐 Auto-detect",
+            "English": "🇺🇸 English",
+            "Spanish": "🇪🇸 Spanish",
+            "French": "🇫🇷 French",
+            "German": "🇩🇪 German",
+            "Italian": "🇮� Italian",
+            "Portuguese": "🇵🇹 Portuguese",
+            "Russian": "🇷🇺 Russian",
+            "Japanese": "🇯🇵 Japanese",
+            "Korean": "🇰🇷 Korean",
+            "Chinese": "🇨🇳 Chinese",
+            "Arabic": "🇸🇦 Arabic",
+            "Hindi": "🇮�🇳 Hindi",
+            "Urdu": "🇵🇰 Urdu",
+            "Bengali": "🇧🇩 Bengali",
+            "Telugu": "🇮🇳 Telugu",
+            "Marathi": "🇮🇳 Marathi",
+            "Tamil": "🇮🇳 Tamil",
+            "Gujarati": "🇮🇳 Gujarati",
+            "Kannada": "🇮🇳 Kannada",
+            "Malayalam": "🇮🇳 Malayalam",
+            "Odia": "🇮🇳 Odia",
+            "Punjabi": "🇮🇳 Punjabi",
+            "Assamese": "🇮🇳 Assamese",
+            "Nepali": "🇳🇵 Nepali",
+            "Sindhi": "🇵🇰 Sindhi",
+            "Sanskrit": "🇮🇳 Sanskrit",
             "en": "🇺🇸 English",
             "hi": "🇮🇳 Hindi",
             "bn": "🇧🇩 Bengali",
@@ -292,17 +319,26 @@ struct LanguagePickerCard: View {
             "mr": "🇮🇳 Marathi",
             "gu": "🇮🇳 Gujarati",
             "kn": "🇮🇳 Kannada",
+            "ml": "🇮🇳 Malayalam",
+            "or": "🇮🇳 Odia",
+            "pa": "🇮🇳 Punjabi",
+            "as": "🇮🇳 Assamese",
+            "ne": "🇳🇵 Nepali",
+            "sd": "🇵🇰 Sindhi",
+            "sa": "🇮🇳 Sanskrit",
             "ur": "🇵🇰 Urdu",
             "es": "🇪🇸 Spanish",
             "fr": "🇫🇷 French", 
             "de": "🇩🇪 German",
-            "zh-Hans": "🇨🇳 Chinese",
-            "ar": "🇸🇦 Arabic",
+            "it": "�� Italian",
+            "pt": "�� Portuguese",
             "ru": "🇷🇺 Russian",
             "ja": "🇯🇵 Japanese",
-            "ko": "🇰🇷 Korean"
+            "ko": "🇰🇷 Korean",
+            "zh": "🇨🇳 Chinese",
+            "ar": "🇸🇦 Arabic"
         ]
-        return languageNames[code] ?? "🌍 \(code.uppercased())"
+        return languageNames[code] ?? "🌍 \(code)"
     }
 }
 

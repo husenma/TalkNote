@@ -21,6 +21,11 @@ class TranscriptionViewModel: ObservableObject {
     @Published var learningProgress: Float = 0.0
     @Published var predictionReasoning = ""
     
+    // UI Control Settings
+    @Published var isMLLearningEnabled = true
+    @Published var isAutoDetectEnabled = true
+    @Published var confidenceThreshold: Double = 0.8
+    
     let supportedSources = ["Auto-detect", "English", "Spanish", "French", "German", "Italian", "Portuguese", "Russian", "Japanese", "Korean", "Chinese", "Arabic", "Hindi", "Urdu", "Bengali", "Telugu", "Marathi", "Tamil", "Gujarati", "Kannada", "Malayalam", "Odia", "Punjabi", "Assamese", "Nepali", "Sindhi", "Sanskrit"]
     let supportedTargets = ["English", "Spanish", "French", "German", "Italian", "Portuguese", "Russian", "Japanese", "Korean", "Chinese", "Arabic", "Hindi", "Urdu", "Bengali", "Telugu", "Marathi", "Tamil", "Gujarati", "Kannada", "Malayalam", "Odia", "Punjabi", "Assamese", "Nepali", "Sindhi", "Sanskrit"]
     
@@ -115,8 +120,8 @@ class TranscriptionViewModel: ObservableObject {
     
     func start() async {
         await MainActor.run {
-            self.statusMessage = "Starting..."
-            self.debugStatus = "Ready to listen"
+            self.statusMessage = "Ready"
+            self.debugStatus = "🎙️ Starting..."
             self.isRecording = true
             self.isTranscribing = true
         }
@@ -130,8 +135,8 @@ class TranscriptionViewModel: ObservableObject {
             }
             
             await MainActor.run {
-                self.statusMessage = "Recording..."
-                self.debugStatus = "Microphone active"
+                self.statusMessage = "Listening"
+                self.debugStatus = "🎙️ Ready"
             }
             
             // Try Azure Speech Service first
@@ -160,7 +165,7 @@ class TranscriptionViewModel: ObservableObject {
     
     private func startAzureSpeechService() async {
         await MainActor.run {
-            self.debugStatus = "Trying Azure Speech Service..."
+            self.debugStatus = "🚀 Connecting..."
         }
         
         do {
@@ -168,14 +173,15 @@ class TranscriptionViewModel: ObservableObject {
             speechService.start(onResult: { [weak self] text, isFinal, detectedLanguage in
                 Task { @MainActor in
                     guard let self = self else { return }
-                    // Update UI immediately for real-time display
+                    // IMMEDIATE real-time display - no processing delays
                     self.transcribedText = text
                     self.displayText = text
-                    self.debugStatus = "Listening with Azure..."
+                    self.debugStatus = "🎙️ Azure Live"
                     
-                    // Only do heavy processing on final results
+                    // Only do ML processing on final results in background
                     if isFinal {
-                        Task {
+                        // Don't await - let it run in background
+                        Task.detached {
                             await self.processTranscriptionResult(text)
                         }
                     }
@@ -192,7 +198,7 @@ class TranscriptionViewModel: ObservableObject {
     
     private func startAppleSpeechRecognition() async {
         await MainActor.run {
-            self.debugStatus = "Starting Apple Speech..."
+            self.debugStatus = "🍎 Connecting..."
         }
         
         guard let recognizer = SFSpeechRecognizer() else {
@@ -218,15 +224,17 @@ class TranscriptionViewModel: ObservableObject {
             speechTask = try await recognizer.recognitionTask(with: request) { result, error in
                 if let result = result {
                     Task { @MainActor in
-                        // Update UI immediately for real-time display
-                        self.transcribedText = result.bestTranscription.formattedString
-                        self.displayText = result.bestTranscription.formattedString
-                        self.debugStatus = "Transcribing..."
+                        // IMMEDIATE real-time display - no processing delays
+                        let currentText = result.bestTranscription.formattedString
+                        self.transcribedText = currentText
+                        self.displayText = currentText
+                        self.debugStatus = "🎙️ Live"
                         
-                        // Only do heavy processing on final results
+                        // Only do ML processing on final results in background
                         if result.isFinal {
-                            Task {
-                                await self.processTranscriptionResult(result.bestTranscription.formattedString)
+                            // Don't await - let it run in background
+                            Task.detached {
+                                await self.processTranscriptionResult(currentText)
                             }
                         }
                     }
@@ -235,7 +243,7 @@ class TranscriptionViewModel: ObservableObject {
                 if let error = error {
                     Task { @MainActor in
                         self.statusMessage = "Recognition error"
-                        self.debugStatus = "Speech recognition error"
+                        self.debugStatus = "Error occurred"
                     }
                 }
             }
@@ -248,55 +256,67 @@ class TranscriptionViewModel: ObservableObject {
     }
     
     private func processTranscriptionResult(_ result: String) async {
-        // Don't update displayText here to avoid overriding real-time updates
-        await MainActor.run {
-            self.debugStatus = "Processing with AI..."
+        // Skip ML processing if disabled
+        guard isMLLearningEnabled else {
+            await MainActor.run {
+                self.displayText = result
+            }
+            return
         }
         
-        // Enhanced ML language detection
-        let enhancedPrediction = await enhancedRL.getPredictedLanguageWithRL(
-            for: result,
-            context: currentTranscriptionContext
-        )
+        // Background ML processing - don't update displayText to avoid overriding real-time updates
         
-        await MainActor.run {
-            self.detectedLanguage = enhancedPrediction.language
-            self.detectedLanguageCode = self.languageNameToCode(enhancedPrediction.language)
-            self.predictionReasoning = enhancedPrediction.reasoning
-            self.debugStatus = "AI Complete - \(enhancedPrediction.language)"
+        // Enhanced ML language detection (in background) - only if auto-detect is enabled
+        if isAutoDetectEnabled {
+            let enhancedPrediction = await enhancedRL.getPredictedLanguageWithRL(
+                for: result,
+                context: currentTranscriptionContext
+            )
+            
+            // Apply confidence threshold
+            if enhancedPrediction.confidence >= Float(confidenceThreshold) {
+                await MainActor.run {
+                    // Only update language detection results, not the displayed text
+                    self.detectedLanguage = enhancedPrediction.language
+                    self.detectedLanguageCode = self.languageNameToCode(enhancedPrediction.language)
+                    self.predictionReasoning = enhancedPrediction.reasoning
+                    // Keep showing live status, don't override with AI processing status
+                }
+                
+                // Translate if not English (in background) and confidence is high enough
+                if enhancedPrediction.language != "en" {
+                    await translateText(result)
+                }
+            } else {
+                // Low confidence - use default language or skip translation
+                await MainActor.run {
+                    self.predictionReasoning = "Low confidence (\(Int(enhancedPrediction.confidence * 100))%) - using default language"
+                }
+            }
         }
         
-        // Translate if not English
-        if enhancedPrediction.language != "en" {
-            await translateText(result)
-        }
-        
-        // Store for learning (add missing method to UserLearningStore)
+        // Store for learning (in background) - only if ML learning is enabled
         learningStore.addPhrase(result)
         
-        // Also store for reinforcement learning
+        // Store for reinforcement learning (in background)
         await storeForReinforcementLearning(
             originalText: result,
-            detectedLanguage: enhancedPrediction.language,
+            detectedLanguage: detectedLanguage,
             translatedText: translatedText
         )
     }
     
     private func translateText(_ text: String) async {
-        await MainActor.run {
-            self.debugStatus = "Translating text..."
-        }
-        
+        // Background translation - don't show translation status in debug
         do {
             let translated = try await translatorService.translate(text: text, from: detectedLanguageCode ?? "auto", to: "en")
             await MainActor.run {
                 self.translatedText = translated
-                self.debugStatus = "Translation complete"
+                // Don't override debug status with translation status
             }
         } catch {
             await MainActor.run {
                 self.translatedText = "Translation failed"
-                self.debugStatus = "Translation error"
             }
         }
     }

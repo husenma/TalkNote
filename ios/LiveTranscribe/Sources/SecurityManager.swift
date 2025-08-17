@@ -179,7 +179,9 @@ public class SecurityManager: ObservableObject {
         let context = LAContext()
         var error: NSError?
         
+        // Check if biometrics are available
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            print("Biometric authentication unavailable: \(error?.localizedDescription ?? "Unknown error")")
             return false
         }
         
@@ -189,15 +191,47 @@ public class SecurityManager: ObservableObject {
                 localizedReason: "Authenticate to secure TalkNote"
             )
             
-            if success {
-                biometricAuthEnabled = true
-                return true
+            await MainActor.run {
+                self.biometricAuthEnabled = success
             }
+            
+            return success
+            
+        } catch let error as LAError {
+            print("Biometric authentication failed with LAError: \(error.localizedDescription)")
+            
+            // Handle specific LAError cases
+            switch error.code {
+            case .biometryNotAvailable:
+                print("Biometry not available on this device")
+            case .biometryNotEnrolled:
+                print("User has not enrolled biometric authentication")
+            case .userCancel:
+                print("User cancelled biometric authentication")
+            case .userFallback:
+                print("User chose to use fallback authentication")
+            case .systemCancel:
+                print("System cancelled biometric authentication")
+            case .passcodeNotSet:
+                print("Passcode not set on device")
+            case .biometryLockout:
+                print("Biometry is locked out")
+            default:
+                print("Other biometric error: \(error.localizedDescription)")
+            }
+            
+            await MainActor.run {
+                self.biometricAuthEnabled = false
+            }
+            return false
+            
         } catch {
-            print("Biometric authentication failed: \(error)")
+            print("Unexpected biometric authentication error: \(error)")
+            await MainActor.run {
+                self.biometricAuthEnabled = false
+            }
+            return false
         }
-        
-        return false
     }
     
     // MARK: - Network Security

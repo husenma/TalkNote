@@ -192,7 +192,7 @@ struct LanguageSettingsView: View {
                             
                             Spacer()
                             
-                            Toggle("", isOn: .constant(true))
+                            Toggle("", isOn: $vm.isMLLearningEnabled)
                                 .toggleStyle(SwitchToggleStyle(tint: TalkNoteDesign.Colors.primaryBlue))
                         }
                         
@@ -212,7 +212,7 @@ struct LanguageSettingsView: View {
                             
                             Spacer()
                             
-                            Toggle("", isOn: .constant(true))
+                            Toggle("", isOn: $vm.isAutoDetectEnabled)
                                 .toggleStyle(SwitchToggleStyle(tint: TalkNoteDesign.Colors.primaryBlue))
                         }
                         
@@ -220,16 +220,28 @@ struct LanguageSettingsView: View {
                         
                         // Confidence Threshold
                         VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
-                            Text("Translation Confidence Threshold")
-                                .font(TalkNoteDesign.Typography.callout)
-                                .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            HStack {
+                                Text("Translation Confidence Threshold")
+                                    .font(TalkNoteDesign.Typography.callout)
+                                    .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                                
+                                Spacer()
+                                
+                                Text("\(Int(vm.confidenceThreshold * 100))%")
+                                    .font(TalkNoteDesign.Typography.caption)
+                                    .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(TalkNoteDesign.Colors.surfaceSecondary)
+                                    .cornerRadius(4)
+                            }
                             
                             HStack {
                                 Text("Low")
                                     .font(TalkNoteDesign.Typography.caption)
                                     .foregroundColor(TalkNoteDesign.Colors.textSecondary)
                                 
-                                Slider(value: .constant(0.8), in: 0.1...1.0)
+                                Slider(value: $vm.confidenceThreshold, in: 0.1...1.0, step: 0.05)
                                     .tint(TalkNoteDesign.Colors.primaryBlue)
                                 
                                 Text("High")
@@ -375,7 +387,52 @@ struct LanguageSettingsView: View {
             "te": "🇮🇳",
             "mr": "🇮🇳",
             "gu": "🇮🇳",
-            "kn": "🇮🇳"
+            "kn": "🇮🇳",
+            "ml": "🇮🇳",
+            "or": "🇮🇳",
+            "pa": "🇮🇳",
+            "as": "🇮🇳",
+            "ne": "🇳🇵",
+            "sd": "🇵🇰",
+            "sa": "🇮🇳",
+            "es": "🇪🇸",
+            "fr": "🇫🇷",
+            "de": "🇩🇪",
+            "it": "🇮🇹",
+            "pt": "🇵🇹",
+            "ru": "🇷🇺",
+            "ja": "🇯🇵",
+            "ko": "🇰🇷",
+            "zh": "🇨🇳",
+            "ar": "🇸🇦",
+            "ur": "🇵🇰",
+            "Auto-detect": "🌐",
+            "English": "🇺🇸",
+            "Spanish": "🇪🇸",
+            "French": "🇫🇷",
+            "German": "🇩🇪",
+            "Italian": "🇮🇹",
+            "Portuguese": "🇵🇹",
+            "Russian": "🇷🇺",
+            "Japanese": "🇯🇵",
+            "Korean": "🇰🇷",
+            "Chinese": "🇨🇳",
+            "Arabic": "🇸🇦",
+            "Hindi": "🇮🇳",
+            "Urdu": "🇵🇰",
+            "Bengali": "🇧🇩",
+            "Telugu": "🇮🇳",
+            "Marathi": "🇮🇳",
+            "Tamil": "🇮🇳",
+            "Gujarati": "🇮🇳",
+            "Kannada": "🇮🇳",
+            "Malayalam": "🇮🇳",
+            "Odia": "🇮🇳",
+            "Punjabi": "🇮🇳",
+            "Assamese": "🇮🇳",
+            "Nepali": "🇳🇵",
+            "Sindhi": "🇵🇰",
+            "Sanskrit": "🇮🇳"
         ]
         return flags[code] ?? "🌐"
     }
