@@ -39,37 +39,6 @@ struct ContentView: View {
                 microphoneButtonView
                     .padding(.bottom, TalkNoteDesign.Spacing.md)
                 
-                // Test buttons for debugging
-                HStack(spacing: TalkNoteDesign.Spacing.sm) {
-                    Button("Test UI") {
-                        vm.testTranscription()
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                    
-                    Button(vm.isMLLearningEnabled ? "AI On" : "AI Off") {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            vm.isMLLearningEnabled.toggle()
-                        }
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                    
-                    Button("Permissions") {
-                        vm.checkPermissionsStatus()
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                    
-                    Button("Clear") {
-                        vm.clearText()
-                        if vm.isTranscribing {
-                            Task {
-                                await vm.stop()
-                            }
-                        }
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                }
-                .padding(.horizontal)
-                
                 // Recording indicator
                 if vm.isTranscribing {
                     recordingIndicatorView
