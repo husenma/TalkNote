@@ -220,7 +220,9 @@ class IndianLanguageMLModel: ObservableObject {
         }
 
         return []
-    }    private func classifyFromEmbeddings(_ embeddings: [Float]) -> [String: Float] {
+    }    
+    
+    private func classifyFromEmbeddings(_ embeddings: [Float]) -> [String: Float] {
         // Use cosine similarity with pre-computed language embeddings
         let languageEmbeddings = getLanguageEmbeddings()
         var scores: [String: Float] = [:]
