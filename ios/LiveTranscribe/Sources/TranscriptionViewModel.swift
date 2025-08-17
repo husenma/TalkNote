@@ -2,12 +2,15 @@ import SwiftUI
 import Foundation
 import AVFoundation
 import Speech
+import WhisperKit
 
 // MARK: - Model Selection Enums
 enum TranscriptionModel: String, CaseIterable, Identifiable {
     case appleOnDevice = "Apple On-Device"
     case appleServer = "Apple Server"
     case azureSpeech = "Azure Speech"
+    case whisperKitBase = "WhisperKit Base"
+    case whisperKitLarge = "WhisperKit Large-v3"
     case customTrained = "Custom Trained"
     
     var id: String { rawValue }
@@ -20,6 +23,10 @@ enum TranscriptionModel: String, CaseIterable, Identifiable {
             return "Apple Server"
         case .azureSpeech:
             return "Azure Speech"
+        case .whisperKitBase:
+            return "Whisper Base"
+        case .whisperKitLarge:
+            return "Whisper Large"
         case .customTrained:
             return "Custom AI"
         }
@@ -33,6 +40,10 @@ enum TranscriptionModel: String, CaseIterable, Identifiable {
             return "Most accurate, requires internet"
         case .azureSpeech:
             return "Multi-language, cloud-based"
+        case .whisperKitBase:
+            return "OpenAI Whisper, balanced performance"
+        case .whisperKitLarge:
+            return "OpenAI Whisper, highest accuracy"
         case .customTrained:
             return "Your personalized model"
         }
@@ -46,8 +57,21 @@ enum TranscriptionModel: String, CaseIterable, Identifiable {
             return "95%"
         case .azureSpeech:
             return "90%"
+        case .whisperKitBase:
+            return "88% (Offline)"
+        case .whisperKitLarge:
+            return "98% (Offline)"
         case .customTrained:
             return "98% (Personal)"
+        }
+    }
+    
+    var isOfflineCapable: Bool {
+        switch self {
+        case .appleOnDevice, .whisperKitBase, .whisperKitLarge, .customTrained:
+            return true
+        case .appleServer, .azureSpeech:
+            return false
         }
     }
 }
@@ -115,6 +139,7 @@ class TranscriptionViewModel: ObservableObject {
     private var speechTask: SFSpeechRecognitionTask?
     private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
     private let learningStore = UserLearningStore()
+    private let whisperKitService = WhisperKitService()
     
     // ML and Reinforcement Learning
     private let indianLanguageML = IndianLanguageMLModel()
@@ -202,6 +227,9 @@ class TranscriptionViewModel: ObservableObject {
         speechTask = nil
         speechRequest = nil
         
+        // Stop WhisperKit if it was being used
+        whisperKitService.stopTranscription()
+        
         self.isRecording = false
         self.isTranscribing = false
         self.statusMessage = "Stopped"
@@ -209,9 +237,15 @@ class TranscriptionViewModel: ObservableObject {
     }
     
     private func startAppleSpeechRecognition() async {
-        self.debugStatus = "🍎 Connecting..."
+        self.debugStatus = "�️ Starting..."
         
-        // Select recognizer based on model preference
+        // Handle WhisperKit models separately
+        if selectedTranscriptionModel == .whisperKitBase || selectedTranscriptionModel == .whisperKitLarge {
+            await startWhisperKitTranscription()
+            return
+        }
+        
+        // Select recognizer based on model preference for Apple models
         let recognizer: SFSpeechRecognizer?
         
         switch selectedTranscriptionModel {
@@ -222,6 +256,10 @@ class TranscriptionViewModel: ObservableObject {
         case .azureSpeech:
             // Fall back to Apple for now, will enhance with Azure
             recognizer = SFSpeechRecognizer()
+        case .whisperKitBase, .whisperKitLarge:
+            // This case is handled above
+            return
+        }
         }
         
         guard let speechRecognizer = recognizer else {
@@ -319,6 +357,82 @@ class TranscriptionViewModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             if self.isTranscribing {
                 self.debugStatus = "🎙️ Live (\(self.selectedTranscriptionModel.rawValue))"
+            }
+        }
+    }
+    
+    // MARK: - WhisperKit Transcription
+    
+    private func startWhisperKitTranscription() async {
+        self.debugStatus = "🤖 Loading Whisper..."
+        
+        // Load appropriate WhisperKit model
+        let whisperModel: WhisperKitService.WhisperModel = selectedTranscriptionModel == .whisperKitLarge ? .large : .base
+        
+        // Ensure WhisperKit model is loaded
+        if !whisperKitService.isInitialized || whisperKitService.selectedModel != whisperModel {
+            await whisperKitService.loadModel(whisperModel)
+        }
+        
+        guard whisperKitService.isInitialized else {
+            self.statusMessage = "WhisperKit failed to initialize"
+            self.debugStatus = "WhisperKit error"
+            self.isTranscribing = false
+            return
+        }
+        
+        self.debugStatus = "🤖 WhisperKit Ready"
+        
+        // Configure audio engine for WhisperKit (16kHz, mono)
+        do {
+            let audioStream = try audioEngine.startStreamingForWhisperKit()
+            
+            // Start WhisperKit streaming transcription
+            Task {
+                await whisperKitService.startStreamingTranscription(audioData: audioStream)
+            }
+            
+            // Monitor WhisperKit transcription results
+            monitorWhisperKitResults()
+            
+        } catch {
+            self.statusMessage = "Audio setup failed"
+            self.debugStatus = "Audio error: \(error.localizedDescription)"
+            self.isTranscribing = false
+        }
+    }
+    
+    private func monitorWhisperKitResults() {
+        // Update UI with WhisperKit results
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
+            guard let self = self, self.isTranscribing else {
+                timer.invalidate()
+                return
+            }
+            
+            Task { @MainActor in
+                if !self.whisperKitService.currentText.isEmpty {
+                    let transcription = self.whisperKitService.currentText
+                    
+                    // Update display text
+                    self.displayText = transcription
+                    
+                    // Update status with confidence and processing time
+                    let confidence = Int(self.whisperKitService.confidence * 100)
+                    let processTime = Int(self.whisperKitService.processingTime * 1000)
+                    self.debugStatus = "🤖 WhisperKit (\(confidence)% conf, \(processTime)ms)"
+                    
+                    // Process translation if needed
+                    if self.targetLanguage != "English" && !transcription.isEmpty {
+                        await self.processTranslation(transcription)
+                    }
+                }
+                
+                // Handle errors
+                if let error = self.whisperKitService.errorMessage {
+                    self.statusMessage = "WhisperKit error: \(error)"
+                    self.debugStatus = "Error"
+                }
             }
         }
     }

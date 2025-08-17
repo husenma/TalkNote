@@ -167,4 +167,54 @@ final class AudioEngine {
     func stopRecording() async {
         stop()
     }
+    
+    // MARK: - WhisperKit Support
+    
+    func startStreamingForWhisperKit() throws -> AsyncStream<Data> {
+        return AsyncStream<Data> { continuation in
+            do {
+                // Configure audio session for WhisperKit (16kHz mono)
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+                try audioSession.setActive(true)
+                
+                let inputNode = engine.inputNode
+                let inputFormat = inputNode.inputFormat(forBus: bus)
+                
+                // WhisperKit requires 16kHz, mono, 16-bit PCM
+                guard let whisperFormat = AVAudioFormat(
+                    commonFormat: .pcmFormatInt16,
+                    sampleRate: 16000,
+                    channels: 1,
+                    interleaved: false
+                ) else {
+                    continuation.finish()
+                    return
+                }
+                
+                // Install tap to convert audio to WhisperKit format
+                inputNode.installTap(onBus: bus, bufferSize: 1024, format: whisperFormat) { buffer, time in
+                    // Convert buffer to Data for WhisperKit
+                    guard let channelData = buffer.int16ChannelData?[0] else { return }
+                    let frameCount = Int(buffer.frameLength)
+                    let data = Data(bytes: channelData, count: frameCount * 2) // 2 bytes per Int16 sample
+                    continuation.yield(data)
+                }
+                
+                engine.prepare()
+                try engine.start()
+                isEngineStarted = true
+                
+                // Handle termination
+                continuation.onTermination = { _ in
+                    self.engine.stop()
+                    inputNode.removeTap(onBus: self.bus)
+                    self.isEngineStarted = false
+                }
+                
+            } catch {
+                continuation.finish()
+            }
+        }
+    }
 }

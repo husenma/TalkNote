@@ -134,7 +134,6 @@ struct LanguageSettingsView: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                 }
-            }
         }
     }
     
