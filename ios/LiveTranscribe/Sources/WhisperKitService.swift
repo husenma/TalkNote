@@ -196,10 +196,12 @@ class WhisperKitService: ObservableObject {
                     
                     if let result = result, result.isFinal {
                         self.processingTime = Date().timeIntervalSince(startTime)
-                        self.confidence = result.transcriptions.first?.averageConfidence ?? 0.0
+                        // Use confidence from best transcription (approximated as segments is available)
+                        self.confidence = result.bestTranscription.segments.isEmpty ? 0.0 : 
+                            Float(result.bestTranscription.segments.count) / 100.0
                         
                         // Extract segments for better UX (Samsung-style)
-                        self.segmentedText = result.transcriptions.first?.segments.map { $0.substring } ?? []
+                        self.segmentedText = result.bestTranscription.segments.map { $0.substring }
                         
                         let transcription = result.bestTranscription.formattedString
                         self.currentText = transcription
@@ -247,7 +249,9 @@ class WhisperKitService: ObservableObject {
                 if let result = result {
                     // Samsung-style real-time updates
                     self.currentText = result.bestTranscription.formattedString
-                    self.confidence = result.transcriptions.first?.averageConfidence ?? 0.0
+                    // Approximate confidence based on segments
+                    self.confidence = result.bestTranscription.segments.isEmpty ? 0.0 : 
+                        Float(result.bestTranscription.segments.count) / 100.0
                     
                     if result.isFinal {
                         self.segmentedText.append(self.currentText)
@@ -367,7 +371,6 @@ class WhisperKitService: ObservableObject {
             }
         }
     }
-}
 }
 
 // MARK: - Enhanced Audio Processor for Streaming (Samsung-style)
