@@ -2,7 +2,6 @@ import SwiftUI
 import Foundation
 import AVFoundation
 import Speech
-import WhisperKit
 
 // MARK: - Model Selection Enums
 enum TranscriptionModel: String, CaseIterable, Identifiable {
@@ -140,6 +139,7 @@ class TranscriptionViewModel: ObservableObject {
     private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
     private let learningStore = UserLearningStore()
     private let whisperKitService = WhisperKitService()
+    private let thermalManager = ThermalManager()
     
     // ML and Reinforcement Learning
     private let indianLanguageML = IndianLanguageMLModel()
@@ -210,11 +210,28 @@ class TranscriptionViewModel: ObservableObject {
     }
     
     func start() async {
+        // Samsung-style thermal check before starting
+        if thermalManager.thermalState == .critical {
+            self.statusMessage = "Device too hot - cooling down"
+            self.debugStatus = "🌡️ Thermal protection active"
+            return
+        }
+        
+        // Adjust model based on thermal state
+        if thermalManager.isThrottled && (selectedTranscriptionModel == .whisperKitLarge || selectedTranscriptionModel == .customTrained) {
+            // Automatically switch to more efficient model
+            selectedTranscriptionModel = .whisperKitBase
+            self.statusMessage = "Using efficient model to prevent overheating"
+        }
+        
         self.statusMessage = "Starting"
         self.debugStatus = "🎙️ Starting..."
         self.isRecording = true
         self.isTranscribing = true
         self.displayText = "" // Clear previous text
+        
+        // Enable heat reduction mode if needed
+        whisperKitService.setHeatReductionMode(thermalManager.heatReductionActive)
         
         // Start with Apple Speech Recognition directly (more reliable)
         await startAppleSpeechRecognition()
