@@ -91,7 +91,7 @@ final class AudioEngine {
     
     private func setupNoiseReduction(input: AVAudioInputNode, format: AVAudioFormat) {
         // Create noise reduction unit using available iOS audio unit
-        guard let noiseSuppression = AVAudioUnitEffect(audioComponentDescription: 
+        let noiseSuppression = AVAudioUnitEffect(audioComponentDescription: 
             AudioComponentDescription(
                 componentType: kAudioUnitType_Effect,
                 componentSubType: kAudioUnitSubType_NBandEQ, // Use equalizer for noise filtering
@@ -99,10 +99,7 @@ final class AudioEngine {
                 componentFlags: 0,
                 componentFlagsMask: 0
             )
-        ) else {
-            print("Could not create noise reduction unit")
-            return
-        }
+        )
         
         // Attach and connect noise reduction
         engine.attach(noiseSuppression)
