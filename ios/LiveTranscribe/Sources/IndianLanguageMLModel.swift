@@ -1,7 +1,6 @@
 import Foundation
 import CoreML
 import NaturalLanguage
-import CreateML
 
 @MainActor
 class IndianLanguageMLModel: ObservableObject {
