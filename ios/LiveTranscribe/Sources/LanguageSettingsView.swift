@@ -4,6 +4,8 @@ struct LanguageSettingsView: View {
     @ObservedObject var vm: TranscriptionViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingAdvancedSettings = false
+    @State private var showingLanguageSettings = false
+    @State private var showingModelSettings = false
     
     var body: some View {
         NavigationView {
@@ -62,7 +64,7 @@ struct LanguageSettingsView: View {
                         
                         Spacer()
                         
-                        Text(model.accuracy)
+                        Text(vm.dynamicAccuracy.isEmpty ? "Real-time" : vm.dynamicAccuracy)
                             .font(TalkNoteDesign.Typography.caption)
                             .fontWeight(.bold)
                             .foregroundColor(vm.selectedTranscriptionModel == model ? .white : TalkNoteDesign.Colors.primaryBlue)
@@ -201,48 +203,69 @@ struct LanguageSettingsView: View {
     // MARK: - Detailed Language Settings
     
     private var detailedLanguageSettingsView: some View {
-        VStack(spacing: TalkNoteDesign.Spacing.md) {
-            // Source Language Selection
-            CardView {
-                VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
-                    Label("Source Language (What you speak)", systemImage: "mic")
+        CardView {
+            VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
+                HStack {
+                    Label("Language Configuration", systemImage: "globe")
                         .font(TalkNoteDesign.Typography.headline)
                         .foregroundColor(TalkNoteDesign.Colors.textPrimary)
                     
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: TalkNoteDesign.Spacing.sm) {
-                        ForEach(vm.supportedSources, id: \.self) { language in
-                            languageSelectionButton(
-                                language: language,
-                                isSelected: vm.sourceLanguage == language,
-                                action: { vm.sourceLanguage = language }
-                            )
+                    Spacer()
+                    
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            showingLanguageSettings.toggle()
                         }
+                    }) {
+                        Image(systemName: showingLanguageSettings ? "chevron.up" : "chevron.down")
+                            .foregroundColor(TalkNoteDesign.Colors.primaryBlue)
                     }
                 }
-            }
-            
-            // Target Language Selection
-            CardView {
-                VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
-                    Label("Target Language (Translation output)", systemImage: "text.bubble")
-                        .font(TalkNoteDesign.Typography.headline)
-                        .foregroundColor(TalkNoteDesign.Colors.textPrimary)
-                    
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: TalkNoteDesign.Spacing.sm) {
-                        ForEach(vm.supportedTargets, id: \.self) { language in
-                            languageSelectionButton(
-                                language: language,
-                                isSelected: vm.targetLanguage == language,
-                                action: { vm.targetLanguage = language }
-                            )
+                
+                if showingLanguageSettings {
+                    VStack(spacing: TalkNoteDesign.Spacing.md) {
+                        // Source Language Selection
+                        VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
+                            Text("Source Language (What you speak)")
+                                .font(TalkNoteDesign.Typography.callout)
+                                .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            
+                            LazyVGrid(columns: [
+                                GridItem(.flexible()),
+                                GridItem(.flexible()),
+                                GridItem(.flexible())
+                            ], spacing: TalkNoteDesign.Spacing.sm) {
+                                ForEach(vm.supportedSources, id: \.self) { language in
+                                    languageSelectionButton(
+                                        language: language,
+                                        isSelected: vm.sourceLanguage == language,
+                                        action: { vm.sourceLanguage = language }
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Target Language Selection
+                        VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
+                            Text("Target Language (Translation output)")
+                                .font(TalkNoteDesign.Typography.callout)
+                                .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            
+                            LazyVGrid(columns: [
+                                GridItem(.flexible()),
+                                GridItem(.flexible()),
+                                GridItem(.flexible())
+                            ], spacing: TalkNoteDesign.Spacing.sm) {
+                                ForEach(vm.supportedTargets, id: \.self) { language in
+                                    languageSelectionButton(
+                                        language: language,
+                                        isSelected: vm.targetLanguage == language,
+                                        action: { vm.targetLanguage = language }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -356,33 +379,51 @@ struct LanguageSettingsView: View {
     private var modelSelectionView: some View {
         CardView {
             VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
-                Label("Transcription Models", systemImage: "brain.head.profile")
-                    .font(TalkNoteDesign.Typography.headline)
-                    .foregroundColor(TalkNoteDesign.Colors.textPrimary)
-                
-                Text("Choose the best model for your needs. Higher accuracy models may require internet connection.")
-                    .font(TalkNoteDesign.Typography.caption)
-                    .foregroundColor(TalkNoteDesign.Colors.textSecondary)
-                
-                VStack(spacing: TalkNoteDesign.Spacing.sm) {
-                    ForEach(TranscriptionModel.allCases) { model in
-                        modelSelectionCard(model: model)
-                    }
-                }
-                
-                Divider()
-                
-                // Language Model Selection
-                VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
-                    Text("Language Processing Model")
-                        .font(TalkNoteDesign.Typography.callout)
-                        .fontWeight(.semibold)
+                HStack {
+                    Label("AI Model Configuration", systemImage: "brain.head.profile")
+                        .font(TalkNoteDesign.Typography.headline)
                         .foregroundColor(TalkNoteDesign.Colors.textPrimary)
                     
-                    ForEach(LanguageModel.allCases) { languageModel in
-                        languageModelCard(model: languageModel)
+                    Spacer()
+                    
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            showingModelSettings.toggle()
+                        }
+                    }) {
+                        Image(systemName: showingModelSettings ? "chevron.up" : "chevron.down")
+                            .foregroundColor(TalkNoteDesign.Colors.primaryBlue)
                     }
                 }
+                
+                if showingModelSettings {
+                    VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
+                        Text("Choose the best model for your needs. Higher accuracy models may require internet connection.")
+                            .font(TalkNoteDesign.Typography.caption)
+                            .foregroundColor(TalkNoteDesign.Colors.textSecondary)
+                        
+                        VStack(spacing: TalkNoteDesign.Spacing.sm) {
+                            ForEach(TranscriptionModel.allCases) { model in
+                                modelSelectionCard(model: model)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Language Model Selection
+                        VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.sm) {
+                            Text("Language Processing Model")
+                                .font(TalkNoteDesign.Typography.callout)
+                                .fontWeight(.semibold)
+                                .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                            
+                            ForEach(LanguageModel.allCases) { languageModel in
+                                languageModelCard(model: languageModel)
+                            }
+                        }
+                    }
+                }
+            }
             }
         }
     }
@@ -509,7 +550,7 @@ struct LanguageSettingsView: View {
                 HStack {
                     statisticItem(title: "Translations", value: "1,234", icon: "text.bubble")
                     Spacer()
-                    statisticItem(title: "Accuracy", value: "94%", icon: "checkmark.circle")
+                    statisticItem(title: "Live Accuracy", value: vm.dynamicAccuracy.isEmpty ? "Calculating..." : vm.dynamicAccuracy, icon: "target")
                     Spacer()
                     statisticItem(title: "Languages", value: "8", icon: "globe")
                 }

@@ -116,30 +116,22 @@ struct ContentView: View {
             Spacer()
             
             HStack(spacing: TalkNoteDesign.Spacing.sm) {
-                // Permission status indicator
-                Button(action: {
+                // Settings dropdown button with security inside
+                Menu {
+                    Button(action: { showingLanguageSettings = true }) {
+                        Label("Language & AI Settings", systemImage: "globe")
+                    }
+                    
+                    Button(action: { showingSecuritySettings = true }) {
+                        Label("Security Settings", systemImage: "lock")
+                    }
+                    
                     if !startupPermissionManager.allPermissionsGranted {
-                        startupPermissionManager.showingPermissionScreen = true
+                        Button(action: { startupPermissionManager.showingPermissionScreen = true }) {
+                            Label("Grant Permissions", systemImage: "exclamationmark.triangle")
+                        }
                     }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: startupPermissionManager.allPermissionsGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundColor(startupPermissionManager.allPermissionsGranted ? .green : .orange)
-                        Text(startupPermissionManager.allPermissionsGranted ? "Ready to record" : "Permissions needed")
-                            .font(TalkNoteDesign.Typography.caption)
-                            .foregroundColor(TalkNoteDesign.Colors.textSecondary)
-                    }
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Security status
-                Button(action: { showingSecuritySettings = true }) {
-                    SecurityStatusView(securityManager: securityManager)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Settings button
-                Button(action: { showingLanguageSettings = true }) {
+                } label: {
                     Image(systemName: "gearshape.fill")
                         .font(.title2)
                         .foregroundColor(TalkNoteDesign.Colors.primaryBlue)
@@ -256,7 +248,7 @@ struct ContentView: View {
                                         
                                         Spacer()
                                         
-                                        Text("🎯 \(vm.selectedTranscriptionModel.accuracy)")
+                                        Text("🎯 \(vm.dynamicAccuracy)")
                                             .font(.caption2)
                                             .foregroundColor(.green)
                                     }
