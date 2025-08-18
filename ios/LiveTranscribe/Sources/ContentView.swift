@@ -103,11 +103,11 @@ struct ContentView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.xs) {
-                    Text("TalkNote")
+                    Text(vm.isTranscribing ? "Listening..." : "TalkNote")
                         .font(TalkNoteDesign.Typography.largeTitle)
                         .foregroundColor(TalkNoteDesign.Colors.textPrimary)
                     
-                    Text("Real-time Translation")
+                    Text(vm.isTranscribing ? vm.currentLanguage : "Real-time Translation")
                         .font(TalkNoteDesign.Typography.caption)
                         .foregroundColor(TalkNoteDesign.Colors.textSecondary)
                 }

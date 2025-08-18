@@ -205,23 +205,26 @@ struct LanguageSettingsView: View {
     private var detailedLanguageSettingsView: some View {
         CardView {
             VStack(alignment: .leading, spacing: TalkNoteDesign.Spacing.md) {
-                HStack {
-                    Label("Language Configuration", systemImage: "globe")
-                        .font(TalkNoteDesign.Typography.headline)
-                        .foregroundColor(TalkNoteDesign.Colors.textPrimary)
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            showingLanguageSettings.toggle()
-                        }
-                    }) {
+                // This is the button that will control the collapsible section
+                Button(action: {
+                    withAnimation(.spring()) {
+                        showingLanguageSettings.toggle()
+                    }
+                }) {
+                    HStack {
+                        Label("Language Configuration", systemImage: "globe")
+                            .font(TalkNoteDesign.Typography.headline)
+                            .foregroundColor(TalkNoteDesign.Colors.textPrimary)
+                        
+                        Spacer()
+                        
                         Image(systemName: showingLanguageSettings ? "chevron.up" : "chevron.down")
                             .foregroundColor(TalkNoteDesign.Colors.primaryBlue)
                     }
                 }
+                .buttonStyle(PlainButtonStyle()) // Use PlainButtonStyle to avoid default button styling
                 
+                // This is the content that will be shown or hidden
                 if showingLanguageSettings {
                     VStack(spacing: TalkNoteDesign.Spacing.md) {
                         // Source Language Selection
@@ -268,6 +271,7 @@ struct LanguageSettingsView: View {
                             }
                         }
                     }
+                    .padding(.top, TalkNoteDesign.Spacing.sm) // Add some padding to separate from the button
                 }
             }
         }
@@ -423,7 +427,6 @@ struct LanguageSettingsView: View {
                         }
                     }
                 }
-            }
             }
         }
     }

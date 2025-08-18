@@ -120,10 +120,12 @@ class TranscriptionViewModel: ObservableObject {
     // Model Selection Settings
     @Published var selectedTranscriptionModel: TranscriptionModel = .appleOnDevice {
         didSet {
-            // Stop current transcription when model changes to prevent crashes
-            if isTranscribing {
+            // Stop current transcription and re-initialize to prevent crashes
+            if oldValue != selectedTranscriptionModel {
                 Task {
                     await self.stop()
+                    // Re-initialize services with the new model
+                    self.initializeServices()
                     await MainActor.run {
                         self.debugStatus = "Model switched to \(self.selectedTranscriptionModel.rawValue)"
                     }
