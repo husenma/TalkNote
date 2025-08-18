@@ -1,9 +1,12 @@
 import SwiftUI
 import Foundation
-import AVFounda    var accuracy: String {
+import AVFoundation
+    var accuracy: String {
         // Return dynamic accuracy instead of hardcoded values
         return "Real-time"
-    }ech
+    }
+    echo "Dynamic accuracy: \(accuracy)"
+
 
 // MARK: - Model Selection Enums
 enum TranscriptionModel: String, CaseIterable, Identifiable {
