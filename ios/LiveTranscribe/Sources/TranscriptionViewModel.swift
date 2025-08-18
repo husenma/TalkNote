@@ -1,12 +1,7 @@
 import SwiftUI
 import Foundation
 import AVFoundation
-    var accuracy: String {
-        // Return dynamic accuracy instead of hardcoded values
-        return "Real-time"
-    }
-    echo "Dynamic accuracy: \(accuracy)"
-
+import Speech
 
 // MARK: - Model Selection Enums
 enum TranscriptionModel: String, CaseIterable, Identifiable {
@@ -54,20 +49,8 @@ enum TranscriptionModel: String, CaseIterable, Identifiable {
     }
     
     var accuracy: String {
-        switch self {
-        case .appleOnDevice:
-            return "85%"
-        case .appleServer:
-            return "95%"
-        case .azureSpeech:
-            return "90%"
-        case .whisperKitBase:
-            return "88% (Offline)"
-        case .whisperKitLarge:
-            return "98% (Offline)"
-        case .customTrained:
-            return "98% (Personal)"
-        }
+        // Return dynamic accuracy instead of hardcoded values
+        return "Real-time"
     }
     
     var isOfflineCapable: Bool {
@@ -140,9 +123,9 @@ class TranscriptionViewModel: ObservableObject {
             // Stop current transcription when model changes to prevent crashes
             if isTranscribing {
                 Task {
-                    await stop()
+                    await self.stop()
                     await MainActor.run {
-                        debugStatus = "Model switched to \(selectedTranscriptionModel.rawValue)"
+                        self.debugStatus = "Model switched to \(self.selectedTranscriptionModel.rawValue)"
                     }
                 }
             }
@@ -192,7 +175,7 @@ class TranscriptionViewModel: ObservableObject {
         
         // Request permissions on initialization
         _Concurrency.Task {
-            await requestPermissions()
+            await self.requestPermissions()
         }
     }
     
@@ -228,9 +211,9 @@ class TranscriptionViewModel: ObservableObject {
     
     func toggle() {
         if isTranscribing {
-            _Concurrency.Task { await stop() }
+            _Concurrency.Task { await self.stop() }
         } else {
-            _Concurrency.Task { await start() }
+            _Concurrency.Task { await self.start() }
         }
     }
     
@@ -373,7 +356,7 @@ class TranscriptionViewModel: ObservableObject {
                     let confidence = segment.confidence
                     
                     // Update dynamic accuracy based on actual performance
-                    updateAccuracy(confidence: confidence, transcriptionLength: currentText.count)
+                    self.updateAccuracy(confidence: confidence, transcriptionLength: currentText.count)
                     
                     if confidence < 0.5 {
                         self.debugStatus += " - Low confidence"
