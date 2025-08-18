@@ -337,22 +337,30 @@ struct ContentView: View {
     
     private var microphoneButtonView: some View {
         VStack(spacing: TalkNoteDesign.Spacing.sm) {
-            MicrophoneButton(isRecording: $vm.isTranscribing, action: {
-                if startupPermissionManager.allPermissionsGranted && permissionManager.allPermissionsGranted {
-                    Task {
-                        if vm.isTranscribing {
-                            await vm.stop()
-                        } else {
-                            await vm.start()
+            MicrophoneButton(
+                isRecording: Binding(
+                    get: { vm.isTranscribing || vm.isSwitchingModel },
+                    set: { _ in }
+                ), 
+                action: {
+                    if startupPermissionManager.allPermissionsGranted && permissionManager.allPermissionsGranted {
+                        Task {
+                            if vm.isTranscribing {
+                                await vm.stop()
+                            } else {
+                                await vm.start()
+                            }
                         }
+                    } else {
+                        startupPermissionManager.showingPermissionScreen = true
                     }
-                } else {
-                    startupPermissionManager.showingPermissionScreen = true
-                }
-            }, isDisabled: !startupPermissionManager.allPermissionsGranted)
+                }, 
+                isDisabled: !startupPermissionManager.allPermissionsGranted || vm.isSwitchingModel
+            )
             
             Text(startupPermissionManager.allPermissionsGranted ? 
-                 (vm.isTranscribing ? "Tap to stop recording" : "Tap to start recording") :
+                 (vm.isSwitchingModel ? "Switching model..." :
+                  (vm.isTranscribing ? "Tap to stop recording" : "Tap to start recording")) :
                  "Tap to grant permissions")
                 .font(TalkNoteDesign.Typography.caption)
                 .foregroundColor(TalkNoteDesign.Colors.textSecondary)

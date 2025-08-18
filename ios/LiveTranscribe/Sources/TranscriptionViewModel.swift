@@ -93,6 +93,7 @@ class TranscriptionViewModel: ObservableObject {
     @Published var detectedLanguageCode = "auto"
     @Published var isRecording = false
     @Published var isTranscribing = false
+    @Published var isSwitchingModel = false
     @Published var isAutoPaused = false
     @Published var autoResumeTimer: Timer?
     @Published var statusMessage = "Ready"
@@ -123,14 +124,25 @@ class TranscriptionViewModel: ObservableObject {
             if oldValue != selectedTranscriptionModel {
                 Task {
                     let wasTranscribing = self.isTranscribing
-                    await self.stop()
                     
-                    // If the app was transcribing, automatically restart with the new model
+                    await MainActor.run {
+                        self.isSwitchingModel = true
+                        self.debugStatus = "Switching to \(self.selectedTranscriptionModel.rawValue)..."
+                    }
+                    
+                    // Stop current transcription
+                    await self.stopInternal()
+                    
+                    // Small delay to ensure clean stop
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    
+                    // If was transcribing, restart with new model
                     if wasTranscribing {
-                        await self.start()
+                        await self.startInternal()
                     }
                     
                     await MainActor.run {
+                        self.isSwitchingModel = false
                         self.debugStatus = "Model switched to \(self.selectedTranscriptionModel.rawValue)"
                     }
                 }
@@ -234,10 +246,29 @@ class TranscriptionViewModel: ObservableObject {
     }
     
     func start() async {
+        await startInternal()
+    }
+    
+    func stop() async {
+        await stopInternal()
+    }
+    
+    private func startInternal() async {
+        // Check permissions first
+        guard await checkPermissions() else {
+            await MainActor.run {
+                self.statusMessage = "Microphone permission required"
+                self.debugStatus = "❌ Missing permissions"
+            }
+            return
+        }
+        
         // Samsung-style thermal check before starting
         if thermalManager.thermalState == .critical {
-            self.statusMessage = "Device too hot - cooling down"
-            self.debugStatus = "🌡️ Thermal protection active"
+            await MainActor.run {
+                self.statusMessage = "Device too hot - cooling down"
+                self.debugStatus = "🌡️ Thermal protection active"
+            }
             return
         }
         
@@ -245,14 +276,18 @@ class TranscriptionViewModel: ObservableObject {
         if thermalManager.isThrottled && (selectedTranscriptionModel == .whisperKitLarge || selectedTranscriptionModel == .customTrained) {
             // Automatically switch to more efficient model
             selectedTranscriptionModel = .whisperKitBase
-            self.statusMessage = "Using efficient model to prevent overheating"
+            await MainActor.run {
+                self.statusMessage = "Using efficient model to prevent overheating"
+            }
         }
         
-        self.statusMessage = "Starting"
-        self.debugStatus = "🎙️ Starting..."
-        self.isRecording = true
-        self.isTranscribing = true
-        self.displayText = "" // Clear previous text
+        await MainActor.run {
+            self.statusMessage = "Starting transcription..."
+            self.debugStatus = "🎙️ Starting..."
+            self.isRecording = true
+            self.isTranscribing = true
+            self.displayText = "" // Clear previous text
+        }
         
         // Enable heat reduction mode if needed
         whisperKitService.setHeatReductionMode(thermalManager.heatReductionActive)
@@ -261,7 +296,7 @@ class TranscriptionViewModel: ObservableObject {
         await startAppleSpeechRecognition()
     }
     
-    func stop() async {
+    private func stopInternal() async {
         audioEngine.stop()
         speechRequest?.endAudio()
         speechTask?.cancel()
@@ -271,10 +306,12 @@ class TranscriptionViewModel: ObservableObject {
         // Stop WhisperKit if it was being used
         whisperKitService.stopTranscription()
         
-        self.isRecording = false
-        self.isTranscribing = false
-        self.statusMessage = "Stopped"
-        self.debugStatus = "Ready"
+        await MainActor.run {
+            self.isRecording = false
+            self.isTranscribing = false
+            self.statusMessage = "Stopped"
+            self.debugStatus = "Ready"
+        }
     }
     
     private func startAppleSpeechRecognition() async {
