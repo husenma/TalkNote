@@ -107,7 +107,7 @@ struct ContentView: View {
                         .font(TalkNoteDesign.Typography.largeTitle)
                         .foregroundColor(TalkNoteDesign.Colors.textPrimary)
                     
-                    Text(vm.isTranscribing ? vm.currentLanguage : "Real-time Translation")
+                    Text(vm.isTranscribing ? vm.detectedLanguage : "Real-time Translation")
                         .font(TalkNoteDesign.Typography.caption)
                         .foregroundColor(TalkNoteDesign.Colors.textSecondary)
                 }
